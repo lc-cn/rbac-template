@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
+import { useI18n } from '@/i18n/context'
+import { PageShell, PageHeader, CardToolbar } from '@/components/layout/page-shell'
 import { Plus, Pencil, Trash2, Save } from 'lucide-react'
 
 interface SystemConfig {
@@ -38,7 +40,7 @@ interface OAuthProvider {
 const OAUTH_TYPES = ['github', 'wechat', 'google', 'dingtalk', 'feishu', 'custom']
 
 export default function SystemConfigPage() {
-  const [configs, setConfigs] = useState<SystemConfig[]>([])
+  const { t } = useI18n()
   const [providers, setProviders] = useState<OAuthProvider[]>([])
   const [generalForm, setGeneralForm] = useState<Record<string, string>>({})
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -57,38 +59,38 @@ export default function SystemConfigPage() {
       ])
       const configsData: SystemConfig[] = await configsRes.json()
       const providersData: OAuthProvider[] = await providersRes.json()
-      setConfigs(configsData)
       setProviders(providersData)
-      
+
       const generalConfigs = configsData.filter(c => c.group === 'general')
       const form: Record<string, string> = {}
       generalConfigs.forEach(c => { form[c.key] = c.value })
       setGeneralForm(form)
     } catch {
-      toast({ title: '错误', description: '加载配置失败', variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('systemConfig.loadFail'), variant: 'destructive' })
     }
-  }, [toast])
+  }, [toast, t])
 
   useEffect(() => { fetchData() }, [fetchData])
 
   const saveGeneralConfig = async () => {
     try {
       const configItems = [
-        { key: 'site_name', value: generalForm['site_name'] || '', group: 'general', label: '站点名称' },
-        { key: 'site_url', value: generalForm['site_url'] || '', group: 'general', label: '站点URL' },
-        { key: 'admin_email', value: generalForm['admin_email'] || '', group: 'general', label: '管理员邮箱' },
-        { key: 'session_timeout', value: generalForm['session_timeout'] || '3600', group: 'general', label: '会话超时(秒)' },
+        { key: 'site_name', value: generalForm['site_name'] || '', group: 'general', label: t('systemConfig.labelSiteName') },
+        { key: 'site_url', value: generalForm['site_url'] || '', group: 'general', label: t('systemConfig.labelSiteUrl') },
+        { key: 'admin_email', value: generalForm['admin_email'] || '', group: 'general', label: t('systemConfig.labelAdminEmail') },
+        { key: 'session_timeout', value: generalForm['session_timeout'] || '3600', group: 'general', label: t('systemConfig.labelSessionTimeout') },
       ]
       const res = await fetch('/api/system-config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ configs: configItems }),
       })
-      if (!res.ok) throw new Error('保存失败')
-      toast({ title: '成功', description: '系统配置已保存' })
+      if (!res.ok) throw new Error(t('systemConfig.saveFail'))
+      toast({ title: t('common.success'), description: t('systemConfig.saved') })
       fetchData()
-    } catch (error: any) {
-      toast({ title: '错误', description: error.message, variant: 'destructive' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast({ title: t('common.error'), description: message, variant: 'destructive' })
     }
   }
 
@@ -119,22 +121,27 @@ export default function SystemConfigPage() {
         body: JSON.stringify(providerForm),
       })
       if (!res.ok) throw new Error((await res.json()).error)
-      toast({ title: '成功', description: editProvider ? '提供商已更新' : '提供商已创建' })
+      toast({
+        title: t('common.success'),
+        description: editProvider ? t('systemConfig.providerUpdated') : t('systemConfig.providerCreated'),
+      })
       setDialogOpen(false)
       fetchData()
-    } catch (error: any) {
-      toast({ title: '错误', description: error.message, variant: 'destructive' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast({ title: t('common.error'), description: message, variant: 'destructive' })
     }
   }
 
   const handleDeleteProvider = async () => {
     if (!deleteId) return
     try {
-      await fetch(`/api/oauth-providers/${deleteId}`, { method: 'DELETE' })
-      toast({ title: '成功', description: '提供商已删除' })
+      const res = await fetch(`/api/oauth-providers/${deleteId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(t('systemConfig.deleteFail'))
+      toast({ title: t('common.success'), description: t('systemConfig.providerDeleted') })
       fetchData()
     } catch {
-      toast({ title: '错误', description: '删除失败', variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('systemConfig.deleteFail'), variant: 'destructive' })
     } finally {
       setDeleteId(null)
     }
@@ -142,64 +149,62 @@ export default function SystemConfigPage() {
 
   const toggleProvider = async (provider: OAuthProvider) => {
     try {
-      await fetch(`/api/oauth-providers/${provider.id}`, {
+      const res = await fetch(`/api/oauth-providers/${provider.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...provider, enabled: !provider.enabled }),
       })
+      if (!res.ok) throw new Error(t('systemConfig.updateFail'))
       fetchData()
     } catch {
-      toast({ title: '错误', description: '更新失败', variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('systemConfig.updateFail'), variant: 'destructive' })
     }
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">系统配置</h1>
-        <p className="text-gray-500 mt-1">管理系统全局配置和第三方登录</p>
-      </div>
+    <PageShell density="comfortable">
+      <PageHeader title={t('systemConfig.title')} description={t('systemConfig.subtitle')} />
 
-      <Tabs defaultValue="general">
-        <TabsList className="mb-6">
-          <TabsTrigger value="general">通用配置</TabsTrigger>
-          <TabsTrigger value="oauth">OAuth2 登录</TabsTrigger>
+      <Tabs defaultValue="general" className="flex flex-col gap-6 sm:gap-8">
+        <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
+          <TabsTrigger value="general">{t('systemConfig.tabGeneral')}</TabsTrigger>
+          <TabsTrigger value="oauth">{t('systemConfig.tabOAuth')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general">
           <Card>
             <CardHeader>
-              <CardTitle>通用配置</CardTitle>
-              <CardDescription>系统基础配置信息</CardDescription>
+              <CardTitle>{t('systemConfig.generalTitle')}</CardTitle>
+              <CardDescription>{t('systemConfig.generalDesc')}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>站点名称</Label>
+            <CardContent className="app-form-stack">
+              <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2">
+                <div className="app-form-field">
+                  <Label>{t('systemConfig.siteName')}</Label>
                   <Input
                     value={generalForm['site_name'] || ''}
                     onChange={e => setGeneralForm(p => ({ ...p, site_name: e.target.value }))}
-                    placeholder="RBAC 管理系统"
+                    placeholder={t('systemConfig.placeholderSite')}
                   />
                 </div>
-                <div>
-                  <Label>站点 URL</Label>
+                <div className="app-form-field">
+                  <Label>{t('systemConfig.siteUrl')}</Label>
                   <Input
                     value={generalForm['site_url'] || ''}
                     onChange={e => setGeneralForm(p => ({ ...p, site_url: e.target.value }))}
                     placeholder="https://example.com"
                   />
                 </div>
-                <div>
-                  <Label>管理员邮箱</Label>
+                <div className="app-form-field">
+                  <Label>{t('systemConfig.adminEmail')}</Label>
                   <Input
                     value={generalForm['admin_email'] || ''}
                     onChange={e => setGeneralForm(p => ({ ...p, admin_email: e.target.value }))}
                     placeholder="admin@example.com"
                   />
                 </div>
-                <div>
-                  <Label>会话超时（秒）</Label>
+                <div className="app-form-field">
+                  <Label>{t('systemConfig.sessionTimeout')}</Label>
                   <Input
                     value={generalForm['session_timeout'] || '3600'}
                     onChange={e => setGeneralForm(p => ({ ...p, session_timeout: e.target.value }))}
@@ -207,8 +212,8 @@ export default function SystemConfigPage() {
                   />
                 </div>
               </div>
-              <Button onClick={saveGeneralConfig}>
-                <Save className="h-4 w-4 mr-2" />保存配置
+              <Button className="mt-1 self-start sm:mt-2" onClick={saveGeneralConfig}>
+                <Save className="mr-2 h-4 w-4" />{t('systemConfig.saveConfig')}
               </Button>
             </CardContent>
           </Card>
@@ -217,37 +222,35 @@ export default function SystemConfigPage() {
         <TabsContent value="oauth">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>OAuth2 登录配置</CardTitle>
-                  <CardDescription>配置第三方 OAuth2 登录提供商</CardDescription>
+              <CardToolbar className="items-stretch sm:items-center">
+                <div className="min-w-0 flex-1 space-y-1">
+                  <CardTitle>{t('systemConfig.oauthTitle')}</CardTitle>
+                  <CardDescription>{t('systemConfig.oauthDesc')}</CardDescription>
                 </div>
-                <Button onClick={openCreateProvider}>
-                  <Plus className="h-4 w-4 mr-2" />添加提供商
+                <Button className="w-full shrink-0 sm:w-auto" onClick={openCreateProvider}>
+                  <Plus className="mr-2 h-4 w-4" />{t('systemConfig.addProvider')}
                 </Button>
-              </div>
+              </CardToolbar>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="app-form-stack">
                 {providers.length === 0 ? (
-                  <p className="text-center py-8 text-gray-400">暂无 OAuth2 提供商</p>
+                  <p className="py-10 text-center text-sm text-muted-foreground sm:py-12">{t('systemConfig.noProviders')}</p>
                 ) : providers.map(provider => (
-                  <div key={provider.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{provider.name}</span>
-                          <Badge variant="outline" className="capitalize">{provider.type}</Badge>
-                          <Badge variant={provider.enabled ? 'default' : 'secondary'}>
-                            {provider.enabled ? '已启用' : '已禁用'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Client ID: {provider.clientId.substring(0, 8)}...
-                        </p>
+                  <div key={provider.id} className="app-oauth-provider-row">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium break-all">{provider.name}</span>
+                        <Badge variant="outline" className="shrink-0 capitalize">{provider.type}</Badge>
+                        <Badge variant={provider.enabled ? 'default' : 'secondary'} className="shrink-0">
+                          {provider.enabled ? t('common.enabled') : t('common.disabled')}
+                        </Badge>
                       </div>
+                      <p className="mt-1 break-all text-sm text-muted-foreground">
+                        {t('systemConfig.clientIdPreview')}: {provider.clientId.substring(0, 8)}...
+                      </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end sm:gap-3">
                       <Switch
                         checked={provider.enabled}
                         onCheckedChange={() => toggleProvider(provider)}
@@ -256,7 +259,7 @@ export default function SystemConfigPage() {
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="sm" onClick={() => setDeleteId(provider.id)}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
+                        <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
                   </div>
@@ -269,44 +272,44 @@ export default function SystemConfigPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editProvider ? '编辑提供商' : '添加提供商'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>名称</Label>
+          <DialogHeader><DialogTitle>{editProvider ? t('systemConfig.editProvider') : t('systemConfig.createProvider')}</DialogTitle></DialogHeader>
+          <div className="app-dialog-body">
+            <div className="app-form-field">
+              <Label>{t('systemConfig.providerName')}</Label>
               <Input value={providerForm.name} onChange={e => setProviderForm(p => ({ ...p, name: e.target.value }))} placeholder="GitHub" />
             </div>
-            <div>
-              <Label>类型</Label>
+            <div className="app-form-field">
+              <Label>{t('systemConfig.providerType')}</Label>
               <select
-                className="w-full border rounded-md px-3 py-2 text-sm mt-1"
+                className="app-native-select capitalize"
                 value={providerForm.type}
                 onChange={e => setProviderForm(p => ({ ...p, type: e.target.value }))}
               >
-                {OAUTH_TYPES.map(t => (
-                  <option key={t} value={t} className="capitalize">{t}</option>
+                {OAUTH_TYPES.map(opt => (
+                  <option key={opt} value={opt} className="capitalize">{opt}</option>
                 ))}
               </select>
             </div>
-            <div>
-              <Label>Client ID</Label>
+            <div className="app-form-field">
+              <Label>{t('systemConfig.fieldClientId')}</Label>
               <Input value={providerForm.clientId} onChange={e => setProviderForm(p => ({ ...p, clientId: e.target.value }))} />
             </div>
-            <div>
-              <Label>Client Secret</Label>
+            <div className="app-form-field">
+              <Label>{t('systemConfig.fieldClientSecret')}</Label>
               <Input type="password" value={providerForm.clientSecret} onChange={e => setProviderForm(p => ({ ...p, clientSecret: e.target.value }))} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pt-0.5">
               <Switch
                 id="providerEnabled"
                 checked={providerForm.enabled}
                 onCheckedChange={v => setProviderForm(p => ({ ...p, enabled: v }))}
               />
-              <Label htmlFor="providerEnabled">启用</Label>
+              <Label htmlFor="providerEnabled" className="inline cursor-pointer">{t('common.enabled')}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleProviderSubmit}>保存</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleProviderSubmit}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -314,15 +317,15 @@ export default function SystemConfigPage() {
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>确定要删除该 OAuth2 提供商吗？</AlertDialogDescription>
+            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('systemConfig.deleteProviderConfirm')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteProvider} className="bg-red-600 hover:bg-red-700">删除</AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteProvider} className="bg-red-600 hover:bg-red-700">{t('common.delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   )
 }

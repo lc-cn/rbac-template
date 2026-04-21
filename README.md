@@ -8,7 +8,8 @@
 - 角色管理（CRUD + 权限分配）
 - 权限管理（按应用分组）
 - 应用 / 功能模块管理
-- 系统配置（通用 k/v + OAuth2 提供商）
+- 系统配置（通用 k/v + OAuth2 提供商，与登录页联动）
+- 登录（邮箱密码 + 已启用的 GitHub / Google OAuth2）
 
 ## 技术栈
 
@@ -35,11 +36,20 @@ pnpm dlx prisma db seed
 pnpm dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)，默认管理员账号：
+打开 [http://localhost:3000](http://localhost:3000) 会进入登录页。默认管理员账号：
 
 | 邮箱 | 密码 |
 |---|---|
 | admin@example.com | admin123 |
+
+### OAuth2（系统配置）
+
+此前「OAuth2 登录配置」仅写入数据库，未接入认证流程。现在登录接口使用 **NextAuth**，并在每次请求时读取已 **启用** 且 **Client ID/Secret 非占位符** 的提供商记录：
+
+- **类型为 `github` / `google`**：登录页会出现对应按钮；请在第三方开发者控制台将回调 URL 配置为 `{NEXTAUTH_URL}/api/auth/callback/github` 或 `.../callback/google`。
+- **微信、钉钉、飞书、`custom` 等**：尚未在 NextAuth 中接入，保存后不会影响登录页（需后续单独开发 Provider）。
+
+建议在 `.env.local` 中设置 `NEXTAUTH_URL`（如 `http://localhost:3000`）与 `NEXTAUTH_SECRET`（生产环境务必使用强随机值）。未设置时本地会使用内置回退密钥，**不可用于公网**。
 
 ## 部署到 Vercel
 

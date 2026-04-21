@@ -1,11 +1,22 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
-import { Sidebar } from '@/components/layout/sidebar'
+import { AppShell } from '@/components/layout/app-shell'
 import { Toaster } from '@/components/ui/toaster'
+import { Providers } from '@/components/providers'
+import { cn } from '@/lib/utils'
+
+const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'RBAC 管理系统',
   description: '基于角色的访问控制管理系统',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
 }
 
 export default function RootLayout({
@@ -14,15 +25,12 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN">
-      <body>
-        <div className="flex min-h-screen bg-gray-50">
-          <Sidebar />
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
-        </div>
-        <Toaster />
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className={cn(inter.className, 'min-h-screen antialiased')}>
+        <Providers>
+          <AppShell>{children}</AppShell>
+          <Toaster />
+        </Providers>
       </body>
     </html>
   )

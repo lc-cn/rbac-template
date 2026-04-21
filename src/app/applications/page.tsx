@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
+import { useI18n } from '@/i18n/context'
+import { PageShell, PageHeader, CardToolbar } from '@/components/layout/page-shell'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
 
 interface Application {
@@ -29,6 +31,7 @@ interface Application {
 }
 
 export default function ApplicationsPage() {
+  const { t, locale } = useI18n()
   const [apps, setApps] = useState<Application[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,6 +40,7 @@ export default function ApplicationsPage() {
   const [editApp, setEditApp] = useState<Application | null>(null)
   const [form, setForm] = useState({ name: '', code: '', description: '', status: true })
   const { toast } = useToast()
+  const dateLocale = locale === 'zh' ? 'zh-CN' : 'en-US'
 
   const fetchApps = useCallback(async () => {
     setLoading(true)
@@ -44,11 +48,11 @@ export default function ApplicationsPage() {
       const res = await fetch(`/api/applications?search=${encodeURIComponent(search)}`)
       setApps(await res.json())
     } catch {
-      toast({ title: '错误', description: '获取应用列表失败', variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('applications.fetchFail'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
-  }, [search, toast])
+  }, [search, toast, t])
 
   useEffect(() => { fetchApps() }, [fetchApps])
 
@@ -73,112 +77,124 @@ export default function ApplicationsPage() {
         body: JSON.stringify(form),
       })
       if (!res.ok) throw new Error((await res.json()).error)
-      toast({ title: '成功', description: editApp ? '应用已更新' : '应用已创建' })
+      toast({
+        title: t('common.success'),
+        description: editApp ? t('applications.updated') : t('applications.created'),
+      })
       setDialogOpen(false)
       fetchApps()
-    } catch (error: any) {
-      toast({ title: '错误', description: error.message, variant: 'destructive' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast({ title: t('common.error'), description: message, variant: 'destructive' })
     }
   }
 
   const handleDelete = async () => {
     if (!deleteId) return
     try {
-      await fetch(`/api/applications/${deleteId}`, { method: 'DELETE' })
-      toast({ title: '成功', description: '应用已删除' })
+      const res = await fetch(`/api/applications/${deleteId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(t('applications.deleteFail'))
+      toast({ title: t('common.success'), description: t('applications.deleted') })
       fetchApps()
     } catch {
-      toast({ title: '错误', description: '删除失败', variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('applications.deleteFail'), variant: 'destructive' })
     } finally {
       setDeleteId(null)
     }
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">应用管理</h1>
-          <p className="text-gray-500 mt-1">管理接入系统的应用程序</p>
-        </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />新建应用</Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={t('applications.title')}
+        description={t('applications.subtitle')}
+        actions={
+          <Button className="w-full shrink-0 sm:w-auto" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('applications.create')}
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="搜索应用..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <CardToolbar>
+            <div className="relative min-w-0 max-w-full flex-1 sm:max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder={t('applications.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
             </div>
-            <Button variant="outline" onClick={fetchApps}>搜索</Button>
-          </div>
+            <Button variant="outline" onClick={fetchApps}>{t('common.search')}</Button>
+          </CardToolbar>
         </CardHeader>
         <CardContent>
-          <table className="w-full text-sm">
+          <div className="app-data-table overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-sm">
             <thead>
-              <tr className="border-b">
-                <th className="text-left py-3 px-4 font-medium text-gray-600">应用名</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">编码</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">描述</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">功能数</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">状态</th>
-                <th className="text-left py-3 px-4 font-medium text-gray-600">创建时间</th>
-                <th className="text-right py-3 px-4 font-medium text-gray-600">操作</th>
+              <tr className="border-b border-border">
+                <th className="app-table-head">{t('applications.colName')}</th>
+                <th className="app-table-head">{t('applications.colCode')}</th>
+                <th className="app-table-head">{t('applications.colDesc')}</th>
+                <th className="app-table-head">{t('applications.colFeatures')}</th>
+                <th className="app-table-head">{t('applications.colStatus')}</th>
+                <th className="app-table-head">{t('common.createdAt')}</th>
+                <th className="app-table-head app-table-head-end">{t('common.operation')}</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-400">加载中...</td></tr>
+                <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td></tr>
               ) : apps.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-400">暂无数据</td></tr>
+                <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">{t('common.empty')}</td></tr>
               ) : apps.map(app => (
-                <tr key={app.id} className="border-b hover:bg-gray-50">
-                  <td className="py-3 px-4 font-medium">{app.name}</td>
-                  <td className="py-3 px-4 font-mono text-xs text-gray-600">{app.code}</td>
-                  <td className="py-3 px-4 text-gray-600">{app.description || '-'}</td>
-                  <td className="py-3 px-4"><Badge variant="outline">{app.features.length}</Badge></td>
-                  <td className="py-3 px-4">
-                    <Badge variant={app.status ? 'default' : 'secondary'}>{app.status ? '启用' : '禁用'}</Badge>
+                <tr key={app.id} className="border-b border-border hover:bg-muted/50">
+                  <td className="app-table-cell font-medium">{app.name}</td>
+                  <td className="app-table-cell font-mono text-xs text-muted-foreground">{app.code}</td>
+                  <td className="app-table-cell text-muted-foreground">{app.description || '-'}</td>
+                  <td className="app-table-cell"><Badge variant="outline">{app.features.length}</Badge></td>
+                  <td className="app-table-cell">
+                    <Badge variant={app.status ? 'default' : 'secondary'}>
+                      {app.status ? t('common.enabled') : t('common.disabled')}
+                    </Badge>
                   </td>
-                  <td className="py-3 px-4 text-gray-500">{new Date(app.createdAt).toLocaleDateString('zh-CN')}</td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <td className="app-table-cell text-muted-foreground">{new Date(app.createdAt).toLocaleDateString(dateLocale)}</td>
+                  <td className="app-table-cell app-table-cell-end">
+                    <div className="app-row-actions">
                       <Button variant="ghost" size="sm" onClick={() => openEdit(app)}><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="sm" onClick={() => setDeleteId(app.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => setDeleteId(app.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                     </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </CardContent>
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editApp ? '编辑应用' : '新建应用'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>应用名</Label>
+          <DialogHeader><DialogTitle>{editApp ? t('applications.editTitle') : t('applications.createTitle')}</DialogTitle></DialogHeader>
+          <div className="app-dialog-body">
+            <div className="app-form-field">
+              <Label>{t('applications.colName')}</Label>
               <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
             </div>
-            <div>
-              <Label>应用编码</Label>
-              <Input value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} placeholder="例: admin-system" />
+            <div className="app-form-field">
+              <Label>{t('applications.colCode')}</Label>
+              <Input value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} placeholder={t('applications.codePlaceholder')} />
             </div>
-            <div>
-              <Label>描述</Label>
+            <div className="app-form-field">
+              <Label>{t('common.description')}</Label>
               <Textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pt-0.5">
               <Checkbox id="appStatus" checked={form.status} onCheckedChange={v => setForm(p => ({ ...p, status: !!v }))} />
-              <Label htmlFor="appStatus">启用</Label>
+              <Label htmlFor="appStatus" className="inline cursor-pointer">{t('common.enabled')}</Label>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>保存</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -186,15 +202,15 @@ export default function ApplicationsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>确定要删除该应用吗？删除后相关功能和权限也会被删除。</AlertDialogDescription>
+            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('applications.deleteConfirm')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">删除</AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">{t('common.delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   )
 }

@@ -21,6 +21,8 @@ import {
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
+import { useI18n } from '@/i18n/context'
+import { PageShell, PageHeader, CardToolbar } from '@/components/layout/page-shell'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
 
 interface Application {
@@ -48,6 +50,7 @@ interface Permission {
 }
 
 export default function PermissionsPage() {
+  const { t } = useI18n()
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [features, setFeatures] = useState<Feature[]>([])
   const [applications, setApplications] = useState<Application[]>([])
@@ -71,11 +74,11 @@ export default function PermissionsPage() {
       setFeatures(await featuresRes.json())
       setApplications(await appsRes.json())
     } catch {
-      toast({ title: '错误', description: '加载数据失败', variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('permissions.loadFail'), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
-  }, [search, toast])
+  }, [search, toast, t])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
@@ -111,99 +114,113 @@ export default function PermissionsPage() {
         body: JSON.stringify(form),
       })
       if (!res.ok) throw new Error((await res.json()).error)
-      toast({ title: '成功', description: editPerm ? '权限已更新' : '权限已创建' })
+      toast({
+        title: t('common.success'),
+        description: editPerm ? t('permissions.updated') : t('permissions.created'),
+      })
       setDialogOpen(false)
       fetchAll()
-    } catch (error: any) {
-      toast({ title: '错误', description: error.message, variant: 'destructive' })
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast({ title: t('common.error'), description: message, variant: 'destructive' })
     }
   }
 
   const handleDelete = async () => {
     if (!deleteId) return
     try {
-      await fetch(`/api/permissions/${deleteId}`, { method: 'DELETE' })
-      toast({ title: '成功', description: '权限已删除' })
+      const res = await fetch(`/api/permissions/${deleteId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error(t('permissions.deleteFail'))
+      toast({ title: t('common.success'), description: t('permissions.deleted') })
       fetchAll()
     } catch {
-      toast({ title: '错误', description: '删除失败', variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('permissions.deleteFail'), variant: 'destructive' })
     } finally {
       setDeleteId(null)
     }
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">权限管理</h1>
-          <p className="text-gray-500 mt-1">按应用分组展示系统权限</p>
-        </div>
-        <Button onClick={openCreate}><Plus className="h-4 w-4 mr-2" />新建权限</Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title={t('permissions.title')}
+        description={t('permissions.subtitle')}
+        actions={
+          <Button className="w-full shrink-0 sm:w-auto" onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('permissions.create')}
+          </Button>
+        }
+      />
 
-      <Card className="mb-4">
+      <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input placeholder="搜索权限..." value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
+          <CardToolbar>
+            <div className="relative min-w-0 max-w-full flex-1 sm:max-w-sm">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input placeholder={t('permissions.searchPlaceholder')} value={search} onChange={e => setSearch(e.target.value)} className="pl-9" />
             </div>
-            <Button variant="outline" onClick={fetchAll}>搜索</Button>
-          </div>
+            <Button variant="outline" onClick={fetchAll}>{t('common.search')}</Button>
+          </CardToolbar>
         </CardHeader>
       </Card>
 
       {loading ? (
-        <div className="text-center py-8 text-gray-400">加载中...</div>
+        <div className="py-10 text-center text-sm text-muted-foreground sm:py-12">{t('common.loading')}</div>
       ) : (
-        <Accordion type="multiple" className="space-y-4">
+        <Accordion type="multiple" className="app-accordion-stack">
           {grouped.map(({ app, features: featureGroups, total }) => (
-            <AccordionItem key={app.id} value={app.id} className="border rounded-lg bg-white shadow-sm">
-              <AccordionTrigger className="px-6 py-4 hover:no-underline">
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-gray-900">{app.name}</span>
-                  <Badge variant="outline" className="text-xs">{app.code}</Badge>
-                  <Badge className="text-xs">{total} 个权限</Badge>
+            <AccordionItem
+              key={app.id}
+              value={app.id}
+              className="rounded-xl border border-border/50 bg-card shadow-card ring-1 ring-black/[0.03] dark:ring-white/10"
+            >
+              <AccordionTrigger className="px-3 py-2.5 hover:no-underline sm:px-5 sm:py-3.5">
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                  <span className="min-w-0 break-words font-semibold text-foreground">{app.name}</span>
+                  <Badge variant="outline" className="shrink-0 text-xs">{app.code}</Badge>
+                  <Badge className="shrink-0 text-xs">{t('permissions.countBadge', { count: total })}</Badge>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="px-6 pb-4">
+              <AccordionContent className="space-y-6 px-3 pb-4 sm:space-y-7 sm:px-5 sm:pb-5">
                 {featureGroups.length === 0 ? (
-                  <p className="text-sm text-gray-400 py-2">该应用暂无功能模块</p>
+                  <p className="py-2 text-sm text-muted-foreground">{t('permissions.noFeatures')}</p>
                 ) : featureGroups.map(({ feature, permissions: perms }) => (
-                  <div key={feature.id} className="mb-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium text-gray-700">{feature.name}</span>
+                  <div key={feature.id} className="space-y-3 sm:space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">{feature.name}</span>
                       <Badge variant="secondary" className="text-xs">{feature.code}</Badge>
                     </div>
                     {perms.length === 0 ? (
-                      <p className="text-xs text-gray-400 pl-4">暂无权限</p>
+                      <p className="pl-4 text-xs text-muted-foreground">{t('permissions.noPermissionsUnder')}</p>
                     ) : (
-                      <table className="w-full text-sm">
+                      <div className="-mx-1 overflow-x-auto sm:mx-0">
+                      <table className="w-full min-w-[28rem] text-sm">
                         <thead>
-                          <tr className="bg-gray-50">
-                            <th className="text-left py-2 px-3 font-medium text-gray-600">权限名</th>
-                            <th className="text-left py-2 px-3 font-medium text-gray-600">编码</th>
-                            <th className="text-left py-2 px-3 font-medium text-gray-600">描述</th>
-                            <th className="text-right py-2 px-3 font-medium text-gray-600">操作</th>
+                          <tr className="bg-muted/50">
+                            <th className="app-table-head text-xs sm:text-sm">{t('permissions.colName')}</th>
+                            <th className="app-table-head text-xs sm:text-sm">{t('permissions.colCode')}</th>
+                            <th className="app-table-head text-xs sm:text-sm">{t('permissions.colDesc')}</th>
+                            <th className="app-table-head app-table-head-end text-xs sm:text-sm">{t('common.operation')}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {perms.map(perm => (
-                            <tr key={perm.id} className="border-t hover:bg-gray-50">
-                              <td className="py-2 px-3">{perm.name}</td>
-                              <td className="py-2 px-3 text-gray-500 font-mono text-xs">{perm.code}</td>
-                              <td className="py-2 px-3 text-gray-500">{perm.description || '-'}</td>
-                              <td className="py-2 px-3 text-right">
-                                <div className="flex items-center justify-end gap-1">
+                            <tr key={perm.id} className="border-t border-border hover:bg-muted/40">
+                              <td className="app-table-cell text-sm">{perm.name}</td>
+                              <td className="app-table-cell font-mono text-xs text-muted-foreground">{perm.code}</td>
+                              <td className="app-table-cell text-muted-foreground">{perm.description || '-'}</td>
+                              <td className="app-table-cell app-table-cell-end">
+                                <div className="app-row-actions">
                                   <Button variant="ghost" size="sm" onClick={() => openEdit(perm)}><Pencil className="h-3 w-3" /></Button>
-                                  <Button variant="ghost" size="sm" onClick={() => setDeleteId(perm.id)}><Trash2 className="h-3 w-3 text-red-500" /></Button>
+                                  <Button variant="ghost" size="sm" onClick={() => setDeleteId(perm.id)}><Trash2 className="h-3 w-3 text-destructive" /></Button>
                                 </div>
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -211,20 +228,20 @@ export default function PermissionsPage() {
             </AccordionItem>
           ))}
           {grouped.length === 0 && (
-            <div className="text-center py-8 text-gray-400">暂无应用数据</div>
+            <div className="py-10 text-center text-sm text-muted-foreground sm:py-12">{t('permissions.noApps')}</div>
           )}
         </Accordion>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{editPerm ? '编辑权限' : '新建权限'}</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label>所属功能</Label>
+          <DialogHeader><DialogTitle>{editPerm ? t('permissions.editTitle') : t('permissions.createTitle')}</DialogTitle></DialogHeader>
+          <div className="app-dialog-body">
+            <div className="app-form-field">
+              <Label>{t('permissions.parentFeature')}</Label>
               <Select value={form.featureId} onValueChange={v => setForm(p => ({ ...p, featureId: v }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="选择功能模块" />
+                  <SelectValue placeholder={t('permissions.selectFeature')} />
                 </SelectTrigger>
                 <SelectContent>
                   {features.map(f => (
@@ -235,22 +252,22 @@ export default function PermissionsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>权限名</Label>
+            <div className="app-form-field">
+              <Label>{t('permissions.colName')}</Label>
               <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
             </div>
-            <div>
-              <Label>权限编码</Label>
-              <Input value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} placeholder="例: user:read" />
+            <div className="app-form-field">
+              <Label>{t('permissions.colCode')}</Label>
+              <Input value={form.code} onChange={e => setForm(p => ({ ...p, code: e.target.value }))} placeholder={t('permissions.placeholderCode')} />
             </div>
-            <div>
-              <Label>描述</Label>
+            <div className="app-form-field">
+              <Label>{t('common.description')}</Label>
               <Textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>保存</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -258,15 +275,15 @@ export default function PermissionsPage() {
       <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>确定要删除该权限吗？</AlertDialogDescription>
+            <AlertDialogTitle>{t('common.confirmDelete')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('permissions.deleteConfirm')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">删除</AlertDialogAction>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">{t('common.delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   )
 }
