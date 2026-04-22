@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast'
 import { useI18n } from '@/i18n/context'
 import { PageShell, PageHeader, CardToolbar } from '@/components/layout/page-shell'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
-import type { OAuth2ClientDto } from '@/app/oauth2-clients/types'
+import type { OAuth2ClientDto } from './types'
 
 export default function OAuth2ClientsPage() {
   const { t, locale } = useI18n()

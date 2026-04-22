@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getOAuth2ClientAdminById } from '@/lib/oauth2/client-admin'
-import { OAuth2ClientFormPage } from '@/app/oauth2-clients/oauth2-client-form-page'
+import { OAuth2ClientFormPage } from '../../oauth2-client-form-page'
 
 type PageProps = { params: Promise<{ id: string }> }
 

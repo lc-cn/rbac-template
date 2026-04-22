@@ -19,7 +19,7 @@ import {
   scopesFromForm,
   type OAuth2ClientDto,
   type OAuth2ClientFormState,
-} from '@/app/oauth2-clients/types'
+} from './types'
 
 const SECRET_FLASH_KEY = 'oauth2_client_secret_flash'
 

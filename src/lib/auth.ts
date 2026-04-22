@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GithubProvider from 'next-auth/providers/github'
 import GoogleProvider from 'next-auth/providers/google'
 import { findUserByEmail, listEnabledOAuthProviders } from '@/lib/data-access'
+import { verifyStoredPassword } from '@/lib/password'
 import { LibsqlAdapter } from '@/lib/next-auth-libsql-adapter'
 import { getAuthSecret } from '@/lib/auth-secret'
 
@@ -40,7 +41,7 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
         if (!email || !password) return null
 
         const user = await findUserByEmail(email)
-        if (!user?.password || user.password !== password) return null
+        if (!user?.password || !verifyStoredPassword(user.password, password)) return null
         if (!user.status) return null
 
         const profileImage = user.image ?? user.avatar ?? undefined
@@ -110,16 +111,28 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
         }
         return baseUrl
       },
-      async jwt({ token, user }) {
+      async jwt({ token, user, trigger, session }) {
         if (user?.id) {
           token.sub = user.id
           token.id = user.id
+          token.name = user.name ?? undefined
+          token.email = user.email ?? undefined
+          token.picture = user.image ?? undefined
+        }
+        if (trigger === 'update' && session && typeof session === 'object') {
+          const s = session as { name?: string | null; email?: string | null; image?: string | null }
+          if ('name' in s) token.name = s.name ?? undefined
+          if ('email' in s) token.email = s.email ?? undefined
+          if ('image' in s) token.picture = s.image ?? undefined
         }
         return token
       },
       async session({ session, token }) {
         if (session.user && token.sub) {
           session.user.id = token.sub
+          if (token.name != null) session.user.name = token.name as string
+          if (token.email != null) session.user.email = token.email as string
+          if (token.picture != null) session.user.image = token.picture as string
         }
         return session
       },

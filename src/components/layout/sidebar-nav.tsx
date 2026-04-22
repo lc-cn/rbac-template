@@ -15,10 +15,12 @@ import {
   Settings,
   LayoutDashboard,
   Plug,
+  CircleUser,
 } from 'lucide-react'
 
 const navItems = [
   { href: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
+  { href: '/profile', labelKey: 'nav.profile', icon: CircleUser },
   { href: '/users', labelKey: 'nav.users', icon: Users },
   { href: '/roles', labelKey: 'nav.roles', icon: Shield },
   { href: '/permissions', labelKey: 'nav.permissions', icon: Key },

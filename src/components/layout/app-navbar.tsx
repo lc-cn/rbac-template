@@ -1,6 +1,7 @@
 'use client'
 
-import { Menu, Moon, Sun, Monitor, User, LogOut } from 'lucide-react'
+import Link from 'next/link'
+import { Menu, Moon, Sun, Monitor, User, LogOut, CircleUser } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useSession, signOut } from 'next-auth/react'
 import { useEffect, useState } from 'react'
@@ -137,6 +138,12 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild className="cursor-pointer gap-2">
+                      <Link href="/profile" className="flex items-center gap-2">
+                        <CircleUser className="h-4 w-4" />
+                        {t('nav.profile')}
+                      </Link>
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       className="cursor-pointer gap-2 text-destructive focus:text-destructive"
                       onSelect={() => signOut({ callbackUrl: '/login' })}

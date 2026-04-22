@@ -1,4 +1,5 @@
 import { getDb, newId, nowIso, boolFromSql, isUniqueConstraintError } from '@/lib/db'
+import { hashPassword, verifyStoredPassword } from '@/lib/password'
 
 export { isUniqueConstraintError }
 
@@ -584,9 +585,11 @@ export async function createUser(input: {
   const id = newId()
   const t = nowIso()
   const st = input.status === false ? 0 : 1
+  const rawPw = input.password?.trim()
+  const passwordToStore = rawPw ? hashPassword(rawPw) : null
   await db.execute({
     sql: `INSERT INTO "User" ("id","name","email","emailVerified","image","password","avatar","status","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    args: [id, input.name, input.email, null, null, input.password ?? null, input.avatar ?? null, st, t, t],
+    args: [id, input.name, input.email, null, null, passwordToStore, input.avatar ?? null, st, t, t],
   })
   if (input.roleIds?.length) {
     for (const rid of input.roleIds) {
@@ -617,7 +620,7 @@ export async function updateUser(
   const args: SqlArgs = [data.name, data.email, data.avatar ?? null, st, t]
   if (data.password) {
     sql += `, "password"=?`
-    args.push(data.password as SqlArg)
+    args.push(hashPassword(String(data.password)) as SqlArg)
   }
   sql += ` WHERE "id"=?`
   args.push(id)
@@ -637,6 +640,118 @@ export async function updateUser(
 export async function deleteUser(id: string) {
   const db = getDb()
   await db.execute({ sql: `DELETE FROM "User" WHERE "id" = ?`, args: [id] })
+}
+
+export async function listLinkedAccountsByUserId(userId: string) {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT "id", "provider", "providerAccountId", "type" FROM "Account" WHERE "userId" = ? ORDER BY "provider" ASC`,
+    args: [userId],
+  })
+  return (r.rows as unknown as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    provider: String(row.provider),
+    providerAccountId: String(row.providerAccountId),
+    type: String(row.type),
+  }))
+}
+
+export async function countLinkedAccountsByUserId(userId: string) {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT COUNT(*) as c FROM "Account" WHERE "userId" = ?`,
+    args: [userId],
+  })
+  return Number((r.rows[0] as unknown as { c: number }).c)
+}
+
+function userHasPasswordSet(user: { password: string | null }) {
+  return !!(user.password && user.password.trim())
+}
+
+export async function updateUserSelfProfile(
+  userId: string,
+  data: { name: string; email?: string; image?: string | null; avatar?: string | null }
+) {
+  const db = getDb()
+  const user = await getUserById(userId)
+  if (!user) return { error: 'not_found' as const }
+
+  const emailNext = data.email !== undefined ? data.email.trim() : user.email
+  if (emailNext !== user.email) {
+    const other = await findUserByEmail(emailNext)
+    if (other && other.id !== userId) return { error: 'email_taken' as const }
+  }
+
+  const image = data.image !== undefined ? data.image : user.image
+  const avatar = data.avatar !== undefined ? data.avatar : user.avatar
+  const t = nowIso()
+  await db.execute({
+    sql: `UPDATE "User" SET "name"=?, "email"=?, "image"=?, "avatar"=?, "updatedAt"=? WHERE "id"=?`,
+    args: [data.name.trim(), emailNext, image ?? null, avatar ?? null, t, userId],
+  })
+  return { ok: true as const }
+}
+
+export async function changeUserPassword(
+  userId: string,
+  input: { currentPassword?: string | null; newPassword: string }
+) {
+  const user = await getUserById(userId)
+  if (!user) return { error: 'not_found' as const }
+  const hasPw = userHasPasswordSet(user)
+  if (hasPw) {
+    const cur = input.currentPassword ?? ''
+    if (!verifyStoredPassword(user.password, cur)) return { error: 'invalid_current' as const }
+  }
+  const db = getDb()
+  const t = nowIso()
+  await db.execute({
+    sql: `UPDATE "User" SET "password" = ?, "updatedAt" = ? WHERE "id" = ?`,
+    args: [hashPassword(input.newPassword), t, userId],
+  })
+  return { ok: true as const }
+}
+
+export async function unlinkOAuthAccountForUser(
+  userId: string,
+  provider: string,
+  providerAccountId: string
+): Promise<{ ok: true } | { error: 'not_found' | 'last_login_method' | 'not_linked' }> {
+  const user = await getUserById(userId)
+  if (!user) return { error: 'not_found' }
+  const n = await countLinkedAccountsByUserId(userId)
+  const hasPw = userHasPasswordSet(user)
+  if (n === 1 && !hasPw) return { error: 'last_login_method' }
+
+  const db = getDb()
+  const check = await db.execute({
+    sql: `SELECT "id" FROM "Account" WHERE "userId" = ? AND "provider" = ? AND "providerAccountId" = ? LIMIT 1`,
+    args: [userId, provider, providerAccountId],
+  })
+  if (!check.rows[0]) return { error: 'not_linked' }
+  await db.execute({
+    sql: `DELETE FROM "Account" WHERE "userId" = ? AND "provider" = ? AND "providerAccountId" = ?`,
+    args: [userId, provider, providerAccountId],
+  })
+  return { ok: true }
+}
+
+export async function verifySelfDeleteAccount(
+  userId: string,
+  opts: { password?: string; confirmEmail?: string }
+): Promise<{ ok: true } | { error: 'not_found' | 'invalid' }> {
+  const user = await getUserById(userId)
+  if (!user) return { error: 'not_found' }
+  const hasPw = userHasPasswordSet(user)
+  if (hasPw) {
+    if (!opts.password || !verifyStoredPassword(user.password, opts.password)) return { error: 'invalid' }
+    return { ok: true }
+  }
+  const expected = user.email.trim().toLowerCase()
+  const got = opts.confirmEmail?.trim().toLowerCase() ?? ''
+  if (!got || got !== expected) return { error: 'invalid' }
+  return { ok: true }
 }
 
 export async function listOAuthProviders() {

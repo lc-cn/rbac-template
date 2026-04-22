@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { AppShell } from '@/components/layout/app-shell'
 import { Toaster } from '@/components/ui/toaster'
 import { Providers } from '@/components/providers'
 import { cn } from '@/lib/utils'
@@ -28,7 +27,7 @@ export default function RootLayout({
     <html lang="zh-CN" suppressHydrationWarning>
       <body className={cn(inter.className, 'min-h-screen antialiased')}>
         <Providers>
-          <AppShell>{children}</AppShell>
+          {children}
           <Toaster />
         </Providers>
       </body>

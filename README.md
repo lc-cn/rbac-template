@@ -183,7 +183,7 @@ src/lib/data-access.ts      # 业务 SQL / 聚合查询
 src/lib/next-auth-libsql-adapter.ts  # NextAuth Database Adapter（LibSQL）
 src/lib/oauth2/             # 自建 IdP：issuer、JWT、PKCE、授权码存储
 src/app/oauth/              # /oauth/authorize、/oauth/token、/oauth/userinfo 等
-src/app/docs/oauth2/        # 对外 OAuth2 对接文档（/docs/oauth2，免登录）
+src/app/(docs)/docs/oauth2/ # 对外 OAuth2 对接文档（/docs/oauth2，免登录；路由分组不含控制台布局）
 src/app/.well-known/openid-configuration/  # OIDC Discovery
 ```
 
