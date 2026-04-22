@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { deleteRole, getRoleById, isUniqueConstraintError, updateRole } from '@/lib/data-access'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const role = await prisma.role.findUnique({
-      where: { id },
-      include: {
-        users: { include: { user: true } },
-        permissions: { include: { permission: true } },
-      },
-    })
-    
+    const role = await getRoleById(id)
     if (!role) return NextResponse.json({ error: '角色不存在' }, { status: 404 })
     return NextResponse.json(role)
   } catch (error) {
@@ -24,27 +17,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const body = await request.json()
     const { name, description, permissionIds } = body
-    
-    await prisma.rolePermission.deleteMany({ where: { roleId: id } })
-    
-    const role = await prisma.role.update({
-      where: { id },
-      data: {
-        name,
-        description,
-        permissions: permissionIds ? {
-          create: permissionIds.map((permissionId: string) => ({ permissionId })),
-        } : undefined,
-      },
-      include: {
-        users: { include: { user: true } },
-        permissions: { include: { permission: true } },
-      },
-    })
-    
+    const role = await updateRole(id, { name, description, permissionIds })
     return NextResponse.json(role)
-  } catch (error: any) {
-    if (error.code === 'P2002') return NextResponse.json({ error: '角色名已存在' }, { status: 400 })
+  } catch (error: unknown) {
+    if (isUniqueConstraintError(error)) return NextResponse.json({ error: '角色名已存在' }, { status: 400 })
     return NextResponse.json({ error: '更新角色失败' }, { status: 500 })
   }
 }
@@ -52,7 +28,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    await prisma.role.delete({ where: { id } })
+    await deleteRole(id)
     return NextResponse.json({ message: '删除成功' })
   } catch (error) {
     return NextResponse.json({ error: '删除角色失败' }, { status: 500 })

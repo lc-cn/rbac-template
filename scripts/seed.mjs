@@ -1,0 +1,200 @@
+/**
+ * 使用 @libsql/client 初始化种子数据（不再依赖 Prisma）。
+ * 用法：pnpm run seed（需 .env 中 DATABASE_URL=libsql://... 与 DATABASE_AUTH_TOKEN）
+ */
+import 'dotenv/config'
+import { createClient } from '@libsql/client'
+import { randomUUID } from 'node:crypto'
+
+const url = process.env.DATABASE_URL?.trim()
+if (!url?.startsWith('libsql:')) {
+  console.error('seed 需要 DATABASE_URL 为 LibSQL（libsql://...）')
+  process.exit(1)
+}
+
+const db = createClient({
+  url,
+  authToken: process.env.DATABASE_AUTH_TOKEN,
+})
+
+const now = () => new Date().toISOString()
+
+/** Application 按 code upsert */
+async function upsertApplication() {
+  const code = 'rbac-admin'
+  const r = await db.execute({ sql: `SELECT * FROM "Application" WHERE "code" = ?`, args: [code] })
+  if (r.rows[0]) return r.rows[0]
+  const id = randomUUID()
+  const t = now()
+  await db.execute({
+    sql: `INSERT INTO "Application" ("id","name","code","description","status","createdAt","updatedAt") VALUES (?,?,?,?,1,?,?)`,
+    args: [id, 'RBAC 管理系统', code, '权限管理后台', t, t],
+  })
+  const out = await db.execute({ sql: `SELECT * FROM "Application" WHERE "id" = ?`, args: [id] })
+  return out.rows[0]
+}
+
+async function upsertFeature(appId, code, name, desc) {
+  const r = await db.execute({
+    sql: `SELECT * FROM "Feature" WHERE "applicationId" = ? AND "code" = ?`,
+    args: [appId, code],
+  })
+  if (r.rows[0]) return r.rows[0]
+  const id = randomUUID()
+  const t = now()
+  await db.execute({
+    sql: `INSERT INTO "Feature" ("id","name","code","description","applicationId","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
+    args: [id, name, code, desc, appId, t, t],
+  })
+  const out = await db.execute({ sql: `SELECT * FROM "Feature" WHERE "id" = ?`, args: [id] })
+  return out.rows[0]
+}
+
+async function upsertPermission(featureId, code, name) {
+  const r = await db.execute({ sql: `SELECT * FROM "Permission" WHERE "code" = ?`, args: [code] })
+  if (r.rows[0]) return r.rows[0]
+  const id = randomUUID()
+  const t = now()
+  await db.execute({
+    sql: `INSERT INTO "Permission" ("id","name","code","description","featureId","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
+    args: [id, name, code, null, featureId, t, t],
+  })
+  const out = await db.execute({ sql: `SELECT * FROM "Permission" WHERE "id" = ?`, args: [id] })
+  return out.rows[0]
+}
+
+async function upsertRole(name, desc) {
+  const r = await db.execute({ sql: `SELECT * FROM "Role" WHERE "name" = ?`, args: [name] })
+  if (r.rows[0]) return r.rows[0]
+  const id = randomUUID()
+  const t = now()
+  await db.execute({
+    sql: `INSERT INTO "Role" ("id","name","description","createdAt","updatedAt") VALUES (?,?,?,?,?)`,
+    args: [id, name, desc, t, t],
+  })
+  const out = await db.execute({ sql: `SELECT * FROM "Role" WHERE "id" = ?`, args: [id] })
+  return out.rows[0]
+}
+
+async function upsertRolePerm(roleId, permId) {
+  const t = now()
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO "RolePermission" ("roleId","permissionId","createdAt") VALUES (?,?,?)`,
+    args: [roleId, permId, t],
+  })
+}
+
+async function upsertUser(email, data) {
+  const r = await db.execute({ sql: `SELECT * FROM "User" WHERE "email" = ?`, args: [email] })
+  if (r.rows[0]) return r.rows[0]
+  const id = randomUUID()
+  const t = now()
+  await db.execute({
+    sql: `INSERT INTO "User" ("id","name","email","emailVerified","image","password","avatar","status","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
+    args: [id, data.name, email, null, null, data.password, null, 1, t, t],
+  })
+  const out = await db.execute({ sql: `SELECT * FROM "User" WHERE "id" = ?`, args: [id] })
+  return out.rows[0]
+}
+
+async function upsertUserRole(userId, roleId) {
+  const t = now()
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO "UserRole" ("userId","roleId","createdAt") VALUES (?,?,?)`,
+    args: [userId, roleId, t],
+  })
+}
+
+async function upsertOAuth(name, type, cid, sec, enabled) {
+  const r = await db.execute({ sql: `SELECT * FROM "OAuthProvider" WHERE "name" = ?`, args: [name] })
+  const t = now()
+  if (r.rows[0]) {
+    await db.execute({
+      sql: `UPDATE "OAuthProvider" SET "type"=?, "clientId"=?, "clientSecret"=?, "enabled"=?, "updatedAt"=? WHERE "name"=?`,
+      args: [type, cid, sec, enabled ? 1 : 0, t, name],
+    })
+    return
+  }
+  const id = randomUUID()
+  await db.execute({
+    sql: `INSERT INTO "OAuthProvider" ("id","name","type","clientId","clientSecret","enabled","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?)`,
+    args: [id, name, type, cid, sec, enabled ? 1 : 0, t, t],
+  })
+}
+
+async function upsertSystemConfig(key, value, group, label) {
+  const r = await db.execute({ sql: `SELECT "id" FROM "SystemConfig" WHERE "key" = ?`, args: [key] })
+  const t = now()
+  if (r.rows[0]) {
+    await db.execute({
+      sql: `UPDATE "SystemConfig" SET "value"=?, "group"=?, "label"=?, "updatedAt"=? WHERE "key"=?`,
+      args: [value, group, label, t, key],
+    })
+    return
+  }
+  const id = randomUUID()
+  await db.execute({
+    sql: `INSERT INTO "SystemConfig" ("id","key","value","group","label","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
+    args: [id, key, value, group, label, t, t],
+  })
+}
+
+async function main() {
+  console.log('开始初始化数据...')
+
+  const app = await upsertApplication()
+  const appId = String(app.id)
+
+  const userFeature = await upsertFeature(appId, 'user-mgmt', '用户管理', '用户的增删改查')
+  const roleFeature = await upsertFeature(appId, 'role-mgmt', '角色管理', '角色的增删改查')
+  const permFeature = await upsertFeature(appId, 'perm-mgmt', '权限管理', '权限的增删改查')
+
+  const permissionsData = [
+    ['user:read', '查看用户', userFeature.id],
+    ['user:create', '创建用户', userFeature.id],
+    ['user:update', '编辑用户', userFeature.id],
+    ['user:delete', '删除用户', userFeature.id],
+    ['role:read', '查看角色', roleFeature.id],
+    ['role:create', '创建角色', roleFeature.id],
+    ['role:update', '编辑角色', roleFeature.id],
+    ['role:delete', '删除角色', roleFeature.id],
+    ['perm:read', '查看权限', permFeature.id],
+    ['perm:create', '创建权限', permFeature.id],
+    ['perm:update', '编辑权限', permFeature.id],
+    ['perm:delete', '删除权限', permFeature.id],
+  ]
+
+  const createdPerms = []
+  for (const [code, name, fid] of permissionsData) {
+    createdPerms.push(await upsertPermission(String(fid), code, name))
+  }
+
+  const adminRole = await upsertRole('超级管理员', '拥有系统全部权限')
+  for (const perm of createdPerms) {
+    await upsertRolePerm(String(adminRole.id), String(perm.id))
+  }
+
+  const adminUser = await upsertUser('admin@example.com', {
+    name: '系统管理员',
+    password: 'admin123',
+  })
+  await upsertUserRole(String(adminUser.id), String(adminRole.id))
+
+  await upsertOAuth('GitHub', 'github', 'your-github-client-id', 'your-github-client-secret', false)
+  await upsertOAuth('微信', 'wechat', 'your-wechat-app-id', 'your-wechat-app-secret', false)
+
+  await upsertSystemConfig('site_name', 'RBAC 管理系统', 'general', '站点名称')
+  await upsertSystemConfig('site_url', 'http://localhost:3000', 'general', '站点URL')
+  await upsertSystemConfig('admin_email', 'admin@example.com', 'general', '管理员邮箱')
+  await upsertSystemConfig('session_timeout', '3600', 'general', '会话超时(秒)')
+
+  console.log('数据初始化完成!')
+  console.log('管理员账号: admin@example.com / admin123')
+}
+
+main()
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
+  .finally(() => db.close())

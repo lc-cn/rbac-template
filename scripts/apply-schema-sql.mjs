@@ -1,9 +1,9 @@
 /**
- * 将 Prisma 生成的 SQL 文件应用到 Turso / LibSQL（直连 libsql://，不依赖 Turso CLI 的 api.turso.tech）。
+ * 将 SQL DDL 文件应用到 Turso / LibSQL（直连 libsql://，不依赖 Turso CLI 的 api.turso.tech）。
  *
  * 用法：
- *   pnpm run db:print-create-sql > /tmp/schema.sql
- *   pnpm run db:apply-sql /tmp/schema.sql
+ *   pnpm run db:apply-sql
+ *   pnpm run db:apply-sql path/to/schema.sql
  *
  * 需在项目根 .env 中配置 DATABASE_URL（libsql://...）与 DATABASE_AUTH_TOKEN。
  */
@@ -12,7 +12,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createClient } from '@libsql/client'
 
-const file = path.resolve(process.argv[2] || '/tmp/schema.sql')
+const file = path.resolve(process.argv[2] || 'sql/schema.sql')
 
 const url = process.env.DATABASE_URL?.trim()
 if (!url?.startsWith('libsql:')) {
@@ -21,7 +21,7 @@ if (!url?.startsWith('libsql:')) {
 }
 
 const raw = fs.readFileSync(file, 'utf8')
-/** 按分号拆分；Prisma migrate diff 的 DDL 通常不含语句内分号 */
+/** 按分号拆分语句（语句内勿使用未转义的分号） */
 const statements = raw
   .replace(/\r\n/g, '\n')
   .split(';')

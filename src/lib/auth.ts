@@ -1,9 +1,9 @@
 import type { NextAuthOptions } from 'next-auth'
-import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import GithubProvider from 'next-auth/providers/github'
 import GoogleProvider from 'next-auth/providers/google'
-import { prisma } from '@/lib/prisma'
+import { findUserByEmail, listEnabledOAuthProviders } from '@/lib/data-access'
+import { LibsqlAdapter } from '@/lib/next-auth-libsql-adapter'
 import { getAuthSecret } from '@/lib/auth-secret'
 
 function isPlaceholderOAuthSecret(clientId: string, clientSecret: string) {
@@ -24,10 +24,7 @@ function isPlaceholderOAuthSecret(clientId: string, clientSecret: string) {
  * 登录页当前接入：GitHub、Google（其它 type 需单独接入对应 Provider）。
  */
 export async function buildAuthOptions(): Promise<NextAuthOptions> {
-  const oauthRows = await prisma.oAuthProvider.findMany({
-    where: { enabled: true },
-    orderBy: { updatedAt: 'desc' },
-  })
+  const oauthRows = await listEnabledOAuthProviders()
 
   const providers: NextAuthOptions['providers'] = [
     CredentialsProvider({
@@ -42,12 +39,11 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
         const password = credentials?.password
         if (!email || !password) return null
 
-        const user = await prisma.user.findUnique({ where: { email } })
+        const user = await findUserByEmail(email)
         if (!user?.password || user.password !== password) return null
         if (!user.status) return null
 
-        const profileImage =
-          ('image' in user ? (user as { image?: string | null }).image : null) ?? user.avatar ?? undefined
+        const profileImage = user.image ?? user.avatar ?? undefined
 
         return {
           id: user.id,
@@ -89,7 +85,7 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
   }
 
   return {
-    adapter: PrismaAdapter(prisma),
+    adapter: LibsqlAdapter(),
     session: {
       strategy: 'jwt',
       maxAge: 60 * 60 * 24 * 7,

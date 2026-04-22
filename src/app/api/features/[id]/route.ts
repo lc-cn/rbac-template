@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { deleteFeature, getFeatureById, isUniqueConstraintError, updateFeature } from '@/lib/data-access'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const feature = await prisma.feature.findUnique({
-      where: { id },
-      include: { application: true, permissions: true },
-    })
+    const feature = await getFeatureById(id)
     if (!feature) return NextResponse.json({ error: '功能不存在' }, { status: 404 })
     return NextResponse.json(feature)
   } catch (error) {
@@ -20,15 +17,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
     const body = await request.json()
     const { name, code, description, applicationId } = body
-    
-    const feature = await prisma.feature.update({
-      where: { id },
-      data: { name, code, description, applicationId },
-      include: { application: true, permissions: true },
-    })
+    const feature = await updateFeature(id, { name, code, description, applicationId })
     return NextResponse.json(feature)
-  } catch (error: any) {
-    if (error.code === 'P2002') return NextResponse.json({ error: '该应用下功能编码已存在' }, { status: 400 })
+  } catch (error: unknown) {
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json({ error: '该应用下功能编码已存在' }, { status: 400 })
+    }
     return NextResponse.json({ error: '更新功能失败' }, { status: 500 })
   }
 }
@@ -36,7 +30,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    await prisma.feature.delete({ where: { id } })
+    await deleteFeature(id)
     return NextResponse.json({ message: '删除成功' })
   } catch (error) {
     return NextResponse.json({ error: '删除功能失败' }, { status: 500 })

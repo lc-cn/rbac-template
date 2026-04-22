@@ -1,13 +1,10 @@
-import { prisma } from '@/lib/prisma'
+import { dashboardCounts } from '@/lib/data-access'
 import { DashboardView } from '@/components/dashboard/dashboard-view'
 
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
-  const [userCount, roleCount, permissionCount, appCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.role.count(),
-    prisma.permission.count(),
-    prisma.application.count(),
-  ])
+  const { userCount, roleCount, permissionCount, appCount } = await dashboardCounts()
 
   return (
     <DashboardView
