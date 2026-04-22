@@ -1,7 +1,14 @@
+import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
 import { PrismaLibSql } from '@prisma/adapter-libsql'
 
-const adapter = new PrismaLibSql({ url: 'file:./dev.db' })
+const url = process.env.DATABASE_URL?.trim()
+if (!url?.startsWith('libsql:')) {
+  throw new Error(
+    'seed 需要 DATABASE_URL 为 LibSQL（libsql://...），与运行时一致。请在 .env 中配置 Turso 地址与 DATABASE_AUTH_TOKEN。'
+  )
+}
+const adapter = new PrismaLibSql({ url, authToken: process.env.DATABASE_AUTH_TOKEN })
 const prisma = new PrismaClient({ adapter } as any)
 
 async function main() {

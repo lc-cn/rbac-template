@@ -15,28 +15,32 @@
 
 - **框架**：Next.js 16 App Router
 - **数据库 ORM**：Prisma 7（驱动适配器模式）
-- **本地数据库**：SQLite（via `@libsql/client` 文件模式）
-- **生产数据库**：[Turso](https://turso.tech)（LibSQL，兼容 Vercel Serverless）
+- **数据库**：[Turso](https://turso.tech) / LibSQL（`@prisma/adapter-libsql` + `@libsql/client`）
 - **UI**：Tailwind CSS v4 + shadcn/ui
 
 ## 快速开始（本地开发）
 
 ```bash
-# 1. 安装依赖
+# 1. 安装依赖（若尚未准备 .env，可先：SKIP_DATABASE_URL=1 pnpm install）
 pnpm install
 
-# 2. 复制环境变量文件
-cp .env.example .env.local
+# 2. 复制环境变量并填入 Turso 的 DATABASE_URL / DATABASE_AUTH_TOKEN
+cp .env.example .env
+# 按需再复制一份给 Next：cp .env .env.local
 
-# 3. 初始化数据库并写入种子数据
-pnpm dlx prisma db push
+# 3. 若为 Turso **空库**：导出建表 SQL 并执行（已建表可跳过；见下文「数据库与 Schema」）
+pnpm run db:print-create-sql > /tmp/schema.sql
+pnpm run db:apply-sql /tmp/schema.sql
+# 若本机可访问 api.turso.tech，也可改用：turso db shell <库名> < /tmp/schema.sql
+
+# 4. 写入种子数据（需已配置 .env 中的 DATABASE_URL / DATABASE_AUTH_TOKEN）
 pnpm dlx prisma db seed
 
-# 4. 启动开发服务器
+# 5. 启动开发服务器
 pnpm dev
 ```
 
-复制环境变量后，请按需编辑 `.env.local`：**数据库**至少与 `pnpm dlx prisma db push` 使用的地址一致（详见下方「环境变量说明」）；**登录 / OAuth** 建议填写 `NEXTAUTH_URL`、`NEXTAUTH_SECRET`，否则本地会用内置开发密钥、OAuth 回调可能与控制台配置不一致。
+复制环境变量后，请按需编辑 `.env.local`：**数据库**已统一为 **LibSQL（`libsql://`）**，须配置 `DATABASE_URL` 与（Turso 等远程场景下的）`DATABASE_AUTH_TOKEN`；**登录 / OAuth** 建议填写 `NEXTAUTH_URL`、`NEXTAUTH_SECRET`。
 
 打开 [http://localhost:3000](http://localhost:3000) 会进入登录页。默认管理员账号：
 
@@ -78,13 +82,15 @@ turso db tokens create rbac-template
 # 输出一个长字符串令牌
 ```
 
-### 第二步：推送数据库 Schema
+### 第二步：在 Turso 上应用 Schema
+
+`prisma db push` 无法直接针对 `libsql://`（见上文「数据库与 Schema」）。空库可执行：
 
 ```bash
-# 设置环境变量后推送 schema
-DATABASE_URL="libsql://rbac-template-<username>.turso.io" \
-DATABASE_AUTH_TOKEN="<your-token>" \
-pnpm dlx prisma db push
+export DATABASE_URL="libsql://rbac-template-<username>.turso.io"
+export DATABASE_AUTH_TOKEN="<your-token>"
+pnpm run db:print-create-sql > /tmp/schema.sql
+pnpm run db:apply-sql /tmp/schema.sql
 ```
 
 ### 第三步：在 Vercel 配置环境变量
@@ -108,14 +114,35 @@ vercel deploy
 
 或将代码推送到 GitHub 后，在 Vercel 控制台导入仓库，Vercel 会自动完成构建和部署。
 
+## 数据库与 Schema（LibSQL）
+
+模板已**统一为 LibSQL 连接串**（推荐 [Turso](https://turso.tech)）：`DATABASE_URL` 须为 **`libsql://...`**，不再使用本地 `file:./dev.db` 作为默认库。
+
+受 **Prisma 7.7** 限制：`provider = "sqlite"` 时，**`pnpm dlx prisma db push` 仍无法直接对 `libsql://` 执行**（会报 **P1013** schema 引擎不识别该 scheme）。应用运行时通过 **`@prisma/adapter-libsql`** 连接 Turso 不受影响。
+
+**空库**可先生成建表 SQL 再应用到 Turso：
+
+```bash
+pnpm run db:print-create-sql > /tmp/schema.sql
+# 方式 A：Turso CLI（需能解析 api.turso.tech）
+turso db shell <你的数据库名> < /tmp/schema.sql
+# 方式 B：不经过 Turso 控制面 API，直连 libsql://（本机无法访问 api.turso.tech 时用）
+pnpm run db:apply-sql /tmp/schema.sql
+```
+
+若 `turso db shell` 报错 `lookup api.turso.tech: no such host`，属于 **DNS/网络** 无法访问 Turso 控制面；可换 DNS/VPN 排查，或直接使用上面的 **`pnpm run db:apply-sql`**（使用 `.env` 里的 `DATABASE_URL` + `DATABASE_AUTH_TOKEN`）。
+
+**已有数据**的库请按 [Prisma 与 Turso](https://www.prisma.io/docs/orm/overview/databases/turso) 使用 `migrate diff` / Turso CLI 做增量变更（勿对非空库盲目执行「全量 CREATE」脚本）。
+
 ## 环境变量说明
 
-应用与 Prisma 共用 `DATABASE_URL`；NextAuth 使用 `NEXTAUTH_*`（或 `AUTH_SECRET`）。字段级说明如下；**完整注释版模板**见 [`.env.example`](.env.example)。
+NextAuth 使用 `NEXTAUTH_*`（或 `AUTH_SECRET`）。字段级说明如下；**完整注释版模板**见 [`.env.example`](.env.example)。
 
 | 变量名 | 谁读取 | 必填 | 默认 / 回退 | 说明 |
 |---|---|---|---|---|
-| `DATABASE_URL` | Next.js、Prisma | 否 | 应用内为 `file:./dev.db` | LibSQL 连接串。本地常用 `file:./dev.db`；Turso 为 `libsql://...`。执行 `pnpm dlx prisma db push` 时 Prisma 默认读根目录 **`.env`**，若仅使用 `.env.local` 请先 `export DATABASE_URL=...` 或复制一份 `.env`。 |
-| `DATABASE_AUTH_TOKEN` | Next.js、Prisma | 远程库时必填 | — | 仅在使用 `libsql://...` 等需鉴权的远程地址时设置；纯本地 `file:` 可省略。 |
+| `DATABASE_URL` | Next.js、Prisma CLI、`prisma.config.ts`、seed | **是** | — | **必须为 `libsql://...`**（Turso 等）。`prisma.config.ts` 已 `import 'dotenv/config'`。 |
+| `DATABASE_AUTH_TOKEN` | Next.js、Prisma Client、seed | Turso 等远程时 **是** | — | LibSQL 远程访问令牌。 |
+| `SKIP_DATABASE_URL` | 仅 `prisma.config.ts` / postinstall | 否 | — | 设为 `1` 时跳过 `DATABASE_URL` 校验并占位，**仅**用于尚未写入 `.env` 时执行 `pnpm install`（`postinstall` 会跑 `prisma generate`）。开发/部署前请删除或勿设置，并配置真实 `DATABASE_URL`。 |
 | `NEXTAUTH_URL` | NextAuth、中间件 | 本地可选；**生产 / OAuth 强烈建议** | — | 对外的站点根 URL（含协议，**无末尾斜杠**），如 `http://localhost:3000` 或 `https://your-domain.com`。影响 OAuth 回调校验与重定向；Vercel 上未设易导致第三方登录失败。 |
 | `NEXTAUTH_SECRET` | NextAuth、中间件 | **生产必填**；本地可省略 | 开发用固定回退字符串 | 会话与 JWT 签名密钥。可用 `openssl rand -base64 32` 生成。 |
 | `AUTH_SECRET` | NextAuth、中间件 | 否 | 同左，与 `NEXTAUTH_SECRET` 二选一 | 与 `NEXTAUTH_SECRET` 等价；**同时存在时优先使用 `NEXTAUTH_SECRET`**。 |

@@ -6,7 +6,12 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  const url = process.env.DATABASE_URL ?? 'file:./dev.db'
+  const url = process.env.DATABASE_URL?.trim()
+  if (!url?.startsWith('libsql:')) {
+    throw new Error(
+      'DATABASE_URL 未配置或不是 LibSQL（须以 libsql: 开头）。请使用 Turso 等 LibSQL 服务，勿再使用本地 file: SQLite。'
+    )
+  }
   const authToken = process.env.DATABASE_AUTH_TOKEN
   const adapter = new PrismaLibSql({ url, authToken })
   return new PrismaClient({
