@@ -13,14 +13,41 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { name, clientId, redirectUris, allowedScopes, confidential, clientSecret } = body
+    const {
+      name,
+      clientId,
+      redirectUris,
+      postLogoutRedirectUris,
+      allowedScopes,
+      confidential,
+      clientSecret,
+      logoUrl,
+      clientUri,
+      policyUri,
+      tosUri,
+      jwksUri,
+      grantRefreshToken,
+      accessTokenTtlSeconds,
+      refreshTokenTtlDays,
+      authorizationCodeTtlMinutes,
+    } = body
     const { dto, plainSecret } = await createOAuth2ClientAdmin({
       name,
       clientId,
       redirectUris,
+      postLogoutRedirectUris,
       allowedScopes,
       confidential: Boolean(confidential),
       plainSecret: clientSecret ?? null,
+      logoUrl: logoUrl ?? null,
+      clientUri: clientUri ?? null,
+      policyUri: policyUri ?? null,
+      tosUri: tosUri ?? null,
+      jwksUri: jwksUri ?? null,
+      grantRefreshToken: Boolean(grantRefreshToken),
+      accessTokenTtlSeconds,
+      refreshTokenTtlDays,
+      authorizationCodeTtlMinutes,
     })
     return NextResponse.json(
       { ...dto, ...(plainSecret ? { clientSecret: plainSecret } : {}) },

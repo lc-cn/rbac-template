@@ -40,13 +40,41 @@ export default async function OAuthConsentPage({ searchParams }: { searchParams:
   const appName = row?.name ?? clientId
   const scopes = scope.split(/\s+/).filter(Boolean)
 
+  const metaLinks = [
+    row?.clientUri ? { href: row.clientUri, label: '应用主页' } : null,
+    row?.policyUri ? { href: row.policyUri, label: '隐私政策' } : null,
+    row?.tosUri ? { href: row.tosUri, label: '服务条款' } : null,
+  ].filter((x): x is { href: string; label: string } => x != null)
+
   return (
     <PageShell>
       <PageHeader title="授权确认" description="第三方应用请求访问你的账号信息，请确认是否允许。" />
       <Card className="max-w-lg">
-        <CardHeader>
-          <CardTitle>{appName}</CardTitle>
-          <CardDescription className="break-all">回调地址：{redirectUri}</CardDescription>
+        <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+          {row?.logoUrl ? (
+            <img
+              src={row.logoUrl}
+              alt=""
+              className="mt-0.5 h-14 w-14 shrink-0 rounded-xl border border-border/60 bg-muted object-cover"
+            />
+          ) : (
+            <div className="mt-0.5 h-14 w-14 shrink-0 rounded-xl bg-muted ring-1 ring-border/60" />
+          )}
+          <div className="min-w-0 flex-1">
+            <CardTitle className="leading-snug">{appName}</CardTitle>
+            <CardDescription className="mt-2 break-all">回调地址：{redirectUri}</CardDescription>
+            {metaLinks.length > 0 ? (
+              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                {metaLinks.map((l) => (
+                  <li key={l.href}>
+                    <a href={l.href} target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-4 hover:underline">
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <div>

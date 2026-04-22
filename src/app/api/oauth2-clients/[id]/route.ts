@@ -18,14 +18,41 @@ export async function PUT(request: NextRequest, ctx: RouteCtx) {
   const { id } = await ctx.params
   try {
     const body = await request.json()
-    const { name, redirectUris, allowedScopes, confidential, clientSecret, regenerateSecret } = body
+    const {
+      name,
+      redirectUris,
+      postLogoutRedirectUris,
+      allowedScopes,
+      confidential,
+      clientSecret,
+      regenerateSecret,
+      logoUrl,
+      clientUri,
+      policyUri,
+      tosUri,
+      jwksUri,
+      grantRefreshToken,
+      accessTokenTtlSeconds,
+      refreshTokenTtlDays,
+      authorizationCodeTtlMinutes,
+    } = body
     const { dto, plainSecret } = await updateOAuth2ClientAdmin(id, {
       name,
       redirectUris,
+      postLogoutRedirectUris,
       allowedScopes,
       confidential: confidential === undefined ? undefined : Boolean(confidential),
       plainSecret: clientSecret ?? null,
       regenerateSecret: Boolean(regenerateSecret),
+      logoUrl,
+      clientUri,
+      policyUri,
+      tosUri,
+      jwksUri,
+      grantRefreshToken,
+      accessTokenTtlSeconds,
+      refreshTokenTtlDays,
+      authorizationCodeTtlMinutes,
     })
     return NextResponse.json({ ...dto, ...(plainSecret ? { clientSecret: plainSecret } : {}) })
   } catch (error: unknown) {

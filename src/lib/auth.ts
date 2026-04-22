@@ -96,6 +96,20 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
     providers,
     secret: getAuthSecret(),
     callbacks: {
+      /** 允许登出后跳转到已登记的第三方 post_logout_redirect_uri（开发机 localhost 等） */
+      async redirect({ url, baseUrl }) {
+        if (url.startsWith('/')) return `${baseUrl}${url}`
+        if (url.startsWith(baseUrl)) return url
+        try {
+          const u = new URL(url)
+          const b = new URL(baseUrl)
+          if (u.origin === b.origin) return url
+          if (u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1')) return url
+        } catch {
+          /* ignore */
+        }
+        return baseUrl
+      },
       async jwt({ token, user }) {
         if (user?.id) {
           token.sub = user.id

@@ -20,6 +20,7 @@ export async function GET() {
     authorization_endpoint: `${issuer}/oauth/authorize`,
     token_endpoint: `${issuer}/oauth/token`,
     userinfo_endpoint: `${issuer}/oauth/userinfo`,
+    end_session_endpoint: `${issuer}/oauth/logout`,
     revocation_endpoint: `${issuer}/oauth/revoke`,
     introspection_endpoint: `${issuer}/oauth/introspect`,
     ...(hasJwks ? { jwks_uri: `${issuer}/.well-known/jwks.json` } : {}),

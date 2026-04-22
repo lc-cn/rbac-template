@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'node:crypto'
 import { getServerAuthSession } from '@/lib/session'
-import { insertAuthorizationCode } from '@/lib/oauth2/store'
+import { clampAuthorizationCodeTtlMinutes, insertAuthorizationCode } from '@/lib/oauth2/store'
 import { oauthErrRedirect, validateAuthorizeSearchParams } from '@/lib/oauth2/validate-authorize'
 
 /**
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
   }
 
   const code = randomBytes(32).toString('base64url')
-  const exp = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  const mins = clampAuthorizationCodeTtlMinutes(client)
+  const exp = new Date(Date.now() + mins * 60 * 1000).toISOString()
   await insertAuthorizationCode({
     code,
     clientId: client.clientId,

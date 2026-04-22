@@ -67,12 +67,20 @@ export async function getOAuthJwks(): Promise<{ keys: JWK[] }> {
   return { keys: [jwk] }
 }
 
+function ttlSeconds(raw?: number | null): number {
+  const n = raw == null || !Number.isFinite(raw) ? 3600 : Math.floor(raw)
+  return Math.min(86400, Math.max(300, n))
+}
+
 export async function signAccessToken(params: {
   sub: string
   aud: string
   scope: string
+  /** 秒，默认 3600，范围 300–86400 */
+  expiresInSeconds?: number | null
 }): Promise<string> {
   const issuer = getOAuthIssuer()
+  const expUnix = Math.floor(Date.now() / 1000) + ttlSeconds(params.expiresInSeconds ?? undefined)
   const rsa = await getRsaMaterial()
   if (rsa) {
     return new SignJWT({ scope: params.scope, token_use: 'access' })
@@ -81,7 +89,7 @@ export async function signAccessToken(params: {
       .setSubject(params.sub)
       .setAudience(params.aud)
       .setIssuedAt()
-      .setExpirationTime('1h')
+      .setExpirationTime(expUnix)
       .sign(rsa.privateKey)
   }
   return new SignJWT({ scope: params.scope, token_use: 'access' })
@@ -90,7 +98,7 @@ export async function signAccessToken(params: {
     .setSubject(params.sub)
     .setAudience(params.aud)
     .setIssuedAt()
-    .setExpirationTime('1h')
+    .setExpirationTime(expUnix)
     .sign(secretKey())
 }
 
@@ -101,6 +109,8 @@ export async function signIdToken(params: {
   email?: string
   name?: string
   picture?: string
+  /** 与 access_token 对齐；秒，默认 3600，范围 300–86400 */
+  expiresInSeconds?: number | null
 }): Promise<string> {
   const issuer = getOAuthIssuer()
   const body: Record<string, unknown> = {}
@@ -109,6 +119,7 @@ export async function signIdToken(params: {
   if (params.picture != null) body.picture = params.picture
   if (params.nonce) body.nonce = params.nonce
 
+  const expUnix = Math.floor(Date.now() / 1000) + ttlSeconds(params.expiresInSeconds ?? undefined)
   const rsa = await getRsaMaterial()
   if (rsa) {
     return new SignJWT(body)
@@ -117,7 +128,7 @@ export async function signIdToken(params: {
       .setSubject(params.sub)
       .setAudience(params.aud)
       .setIssuedAt()
-      .setExpirationTime('1h')
+      .setExpirationTime(expUnix)
       .sign(rsa.privateKey)
   }
   return new SignJWT(body)
@@ -126,7 +137,7 @@ export async function signIdToken(params: {
     .setSubject(params.sub)
     .setAudience(params.aud)
     .setIssuedAt()
-    .setExpirationTime('1h')
+    .setExpirationTime(expUnix)
     .sign(secretKey())
 }
 

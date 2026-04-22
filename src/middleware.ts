@@ -18,7 +18,8 @@ export async function middleware(req: NextRequest) {
     pathname === '/oauth/token' ||
     pathname === '/oauth/userinfo' ||
     pathname === '/oauth/revoke' ||
-    pathname === '/oauth/introspect'
+    pathname === '/oauth/introspect' ||
+    pathname === '/oauth/logout'
   ) {
     return NextResponse.next()
   }

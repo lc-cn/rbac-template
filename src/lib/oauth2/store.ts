@@ -9,8 +9,77 @@ export type OAuth2ClientRow = {
   name: string
   redirectUrisJson: string
   allowedScopes: string
+  logoUrl: string | null
+  clientUri: string | null
+  policyUri: string | null
+  tosUri: string | null
+  postLogoutRedirectUrisJson: string
+  jwksUri: string | null
+  allowedGrantTypes: string
+  accessTokenTtlSeconds: number
+  refreshTokenTtlDays: number
+  authorizationCodeTtlMinutes: number
   createdAt: string
   updatedAt: string
+}
+
+function numCol(v: unknown, fallback: number): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  if (typeof v === 'bigint') return Number(v)
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
+export function mapOAuth2ClientRow(row: Record<string, unknown>): OAuth2ClientRow {
+  return {
+    id: String(row.id),
+    clientId: String(row.clientId),
+    clientSecretHash: row.clientSecretHash == null ? null : String(row.clientSecretHash),
+    name: String(row.name),
+    redirectUrisJson: String(row.redirectUrisJson),
+    allowedScopes: String(row.allowedScopes),
+    logoUrl: row.logoUrl == null || String(row.logoUrl).trim() === '' ? null : String(row.logoUrl).trim(),
+    clientUri: row.clientUri == null || String(row.clientUri).trim() === '' ? null : String(row.clientUri).trim(),
+    policyUri: row.policyUri == null || String(row.policyUri).trim() === '' ? null : String(row.policyUri).trim(),
+    tosUri: row.tosUri == null || String(row.tosUri).trim() === '' ? null : String(row.tosUri).trim(),
+    postLogoutRedirectUrisJson:
+      row.postLogoutRedirectUrisJson == null || String(row.postLogoutRedirectUrisJson).trim() === ''
+        ? '[]'
+        : String(row.postLogoutRedirectUrisJson),
+    jwksUri: row.jwksUri == null || String(row.jwksUri).trim() === '' ? null : String(row.jwksUri).trim(),
+    allowedGrantTypes:
+      row.allowedGrantTypes == null || String(row.allowedGrantTypes).trim() === ''
+        ? 'authorization_code,refresh_token'
+        : String(row.allowedGrantTypes).trim(),
+    accessTokenTtlSeconds: numCol(row.accessTokenTtlSeconds, 3600),
+    refreshTokenTtlDays: numCol(row.refreshTokenTtlDays, 30),
+    authorizationCodeTtlMinutes: numCol(row.authorizationCodeTtlMinutes, 10),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  }
+}
+
+export function parseGrantTypesCsv(s: string | null | undefined): Set<string> {
+  const raw = (s && s.trim()) || 'authorization_code,refresh_token'
+  return new Set(raw.split(',').map((x) => x.trim()).filter(Boolean))
+}
+
+export function clientAllowsGrant(row: OAuth2ClientRow, grant: 'authorization_code' | 'refresh_token'): boolean {
+  const g = parseGrantTypesCsv(row.allowedGrantTypes)
+  if (g.size === 0) return grant === 'authorization_code'
+  return g.has(grant)
+}
+
+export function clampAccessTokenTtlSeconds(row: OAuth2ClientRow): number {
+  return Math.min(86400, Math.max(300, Math.floor(numCol(row.accessTokenTtlSeconds, 3600))))
+}
+
+export function clampRefreshTokenTtlDays(row: OAuth2ClientRow): number {
+  return Math.min(365, Math.max(1, Math.floor(numCol(row.refreshTokenTtlDays, 30))))
+}
+
+export function clampAuthorizationCodeTtlMinutes(row: OAuth2ClientRow): number {
+  return Math.min(60, Math.max(1, Math.floor(numCol(row.authorizationCodeTtlMinutes, 10))))
 }
 
 export function parseRedirectUris(json: string): string[] {
@@ -32,16 +101,7 @@ export async function getOAuth2ClientByClientId(clientId: string): Promise<OAuth
   const r = await db.execute({ sql: `SELECT * FROM "OAuth2Client" WHERE "clientId" = ?`, args: [clientId] })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
-  return {
-    id: String(row.id),
-    clientId: String(row.clientId),
-    clientSecretHash: row.clientSecretHash == null ? null : String(row.clientSecretHash),
-    name: String(row.name),
-    redirectUrisJson: String(row.redirectUrisJson),
-    allowedScopes: String(row.allowedScopes),
-    createdAt: String(row.createdAt),
-    updatedAt: String(row.updatedAt),
-  }
+  return mapOAuth2ClientRow(row)
 }
 
 export function verifyClientSecret(row: OAuth2ClientRow, plainSecret: string | null): boolean {

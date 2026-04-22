@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
+  clampAccessTokenTtlSeconds,
+  clampRefreshTokenTtlDays,
+  clientAllowsGrant,
   consumeAuthorizationCode,
   getOAuth2ClientByClientId,
   getUserClaimsForToken,
@@ -27,8 +30,6 @@ function parseBasicAuth(header: string | null): { id: string; secret: string } |
   return { id: decoded.slice(0, idx), secret: decoded.slice(idx + 1) }
 }
 
-const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000
-
 async function resolveClientAuth(req: NextRequest, body: URLSearchParams) {
   let clientId = body.get('client_id')
   let clientSecret = body.get('client_secret')
@@ -40,14 +41,21 @@ async function resolveClientAuth(req: NextRequest, body: URLSearchParams) {
   return { clientId, clientSecret }
 }
 
-async function issueAccessAndId(client: OAuth2ClientRow, userId: string, scope: string, nonce: string | null) {
+async function issueAccessAndId(
+  client: OAuth2ClientRow,
+  userId: string,
+  scope: string,
+  nonce: string | null
+) {
   const claims = await getUserClaimsForToken(userId)
   if (!claims) return null
 
+  const accessTtl = clampAccessTokenTtlSeconds(client)
   const accessToken = await signAccessToken({
     sub: claims.sub,
     aud: client.clientId,
     scope,
+    expiresInSeconds: accessTtl,
   })
 
   const wantIdToken = /\bopenid\b/.test(scope)
@@ -57,6 +65,7 @@ async function issueAccessAndId(client: OAuth2ClientRow, userId: string, scope: 
       sub: claims.sub,
       aud: client.clientId,
       nonce,
+      expiresInSeconds: accessTtl,
     }
     if (/\bemail\b/.test(scope) && claims.email) idPayload.email = claims.email
     if (/\bprofile\b/.test(scope)) {
@@ -66,16 +75,18 @@ async function issueAccessAndId(client: OAuth2ClientRow, userId: string, scope: 
     idToken = await signIdToken(idPayload)
   }
 
-  return { accessToken, idToken, scope, claims }
+  return { accessToken, idToken, scope, claims, expiresIn: accessTtl }
 }
 
-async function maybeIssueRefreshToken(clientId: string, userId: string, scope: string) {
+async function maybeIssueRefreshToken(client: OAuth2ClientRow, userId: string, scope: string) {
   if (!/\boffline_access\b/.test(scope)) return undefined
+  if (!clientAllowsGrant(client, 'refresh_token')) return undefined
   const plain = newRefreshTokenPlain()
-  const exp = new Date(Date.now() + REFRESH_TTL_MS).toISOString()
+  const days = clampRefreshTokenTtlDays(client)
+  const exp = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString()
   await insertRefreshTokenRow({
     plainToken: plain,
-    clientId,
+    clientId: client.clientId,
     userId,
     scope,
     expiresAtIso: exp,
@@ -95,6 +106,9 @@ async function handleAuthorizationCode(req: NextRequest, body: URLSearchParams) 
 
   const client = await getOAuth2ClientByClientId(clientId)
   if (!client) return jsonError(400, 'invalid_client')
+  if (!clientAllowsGrant(client, 'authorization_code')) {
+    return jsonError(400, 'unauthorized_client', '该客户端未启用授权码流程')
+  }
 
   const consumed = await consumeAuthorizationCode(code)
   if (!consumed) {
@@ -129,13 +143,13 @@ async function handleAuthorizationCode(req: NextRequest, body: URLSearchParams) 
   const bundle = await issueAccessAndId(client, consumed.userId, consumed.scope, consumed.nonce)
   if (!bundle) return jsonError(400, 'invalid_grant', '用户不可用')
 
-  const refreshToken = await maybeIssueRefreshToken(client.clientId, bundle.claims.sub, bundle.scope)
+  const refreshToken = await maybeIssueRefreshToken(client, bundle.claims.sub, bundle.scope)
 
   return NextResponse.json(
     {
       access_token: bundle.accessToken,
       token_type: 'Bearer',
-      expires_in: 3600,
+      expires_in: bundle.expiresIn,
       scope: bundle.scope,
       ...(bundle.idToken ? { id_token: bundle.idToken } : {}),
       ...(refreshToken ? { refresh_token: refreshToken } : {}),
@@ -154,6 +168,9 @@ async function handleRefreshToken(req: NextRequest, body: URLSearchParams) {
 
   const client = await getOAuth2ClientByClientId(clientId)
   if (!client) return jsonError(400, 'invalid_client')
+  if (!clientAllowsGrant(client, 'refresh_token')) {
+    return jsonError(400, 'unauthorized_client', '该客户端未启用 refresh_token 授权')
+  }
 
   const pub = isPublicClient(client)
   if (!pub && !verifyClientSecret(client, clientSecret)) {
@@ -169,19 +186,20 @@ async function handleRefreshToken(req: NextRequest, body: URLSearchParams) {
   if (!bundle) return jsonError(400, 'invalid_grant', '用户不可用')
 
   const newRefresh = newRefreshTokenPlain()
+  const days = clampRefreshTokenTtlDays(client)
   await insertRefreshTokenRow({
     plainToken: newRefresh,
     clientId: client.clientId,
     userId: row.userId,
     scope: row.scope,
-    expiresAtIso: new Date(Date.now() + REFRESH_TTL_MS).toISOString(),
+    expiresAtIso: new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString(),
   })
 
   return NextResponse.json(
     {
       access_token: bundle.accessToken,
       token_type: 'Bearer',
-      expires_in: 3600,
+      expires_in: bundle.expiresIn,
       scope: bundle.scope,
       refresh_token: newRefresh,
       ...(bundle.idToken ? { id_token: bundle.idToken } : {}),

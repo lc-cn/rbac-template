@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import {
+  clientAllowsGrant,
   getOAuth2ClientByClientId,
   isPublicClient,
   parseRedirectUris,
@@ -81,6 +82,25 @@ export async function validateAuthorizeSearchParams(sp: URLSearchParams): Promis
 
   if (!scopesAllowed(scopeRaw, client.allowedScopes)) {
     return { ok: false, response: oauthErrRedirect(redirectUri, 'invalid_scope', '请求的 scope 超出客户端允许范围', state) }
+  }
+
+  if (!clientAllowsGrant(client, 'authorization_code')) {
+    return {
+      ok: false,
+      response: oauthErrRedirect(redirectUri, 'unauthorized_client', '该客户端未启用授权码（authorization_code）流程', state),
+    }
+  }
+
+  if (/\boffline_access\b/.test(scopeRaw) && !clientAllowsGrant(client, 'refresh_token')) {
+    return {
+      ok: false,
+      response: oauthErrRedirect(
+        redirectUri,
+        'invalid_scope',
+        '客户端未启用 refresh_token 授权，不能请求 offline_access',
+        state
+      ),
+    }
   }
 
   const pub = isPublicClient(client)
