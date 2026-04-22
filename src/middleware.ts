@@ -14,7 +14,12 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith('/.well-known')) {
     return NextResponse.next()
   }
-  if (pathname === '/oauth/token' || pathname === '/oauth/userinfo') {
+  if (
+    pathname === '/oauth/token' ||
+    pathname === '/oauth/userinfo' ||
+    pathname === '/oauth/revoke' ||
+    pathname === '/oauth/introspect'
+  ) {
     return NextResponse.next()
   }
 

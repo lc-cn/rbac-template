@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS "OAuth2Client" (
     "clientSecretHash" TEXT,
     "name" TEXT NOT NULL,
     "redirectUrisJson" TEXT NOT NULL,
-    "allowedScopes" TEXT NOT NULL DEFAULT 'openid profile email',
+    "allowedScopes" TEXT NOT NULL DEFAULT 'openid profile email offline_access',
     "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
     "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
 );

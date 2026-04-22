@@ -142,7 +142,7 @@ CREATE TABLE "OAuth2Client" (
     "clientSecretHash" TEXT,
     "name" TEXT NOT NULL,
     "redirectUrisJson" TEXT NOT NULL,
-    "allowedScopes" TEXT NOT NULL DEFAULT 'openid profile email',
+    "allowedScopes" TEXT NOT NULL DEFAULT 'openid profile email offline_access',
     "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
     "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -165,3 +165,20 @@ CREATE TABLE "OAuth2AuthorizationCode" (
 CREATE UNIQUE INDEX "OAuth2Client_clientId_key" ON "OAuth2Client"("clientId");
 CREATE UNIQUE INDEX "OAuth2AuthorizationCode_code_key" ON "OAuth2AuthorizationCode"("code");
 CREATE INDEX "OAuth2AuthorizationCode_expiresAt_idx" ON "OAuth2AuthorizationCode"("expiresAt");
+
+-- 刷新令牌（offline_access / refresh_token 授权）
+CREATE TABLE "OAuth2RefreshToken" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "tokenHash" TEXT NOT NULL,
+    "clientId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "scope" TEXT NOT NULL,
+    "expiresAt" TEXT NOT NULL,
+    "revokedAt" TEXT,
+    "replacedById" TEXT,
+    "createdAt" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX "OAuth2RefreshToken_tokenHash_key" ON "OAuth2RefreshToken"("tokenHash");
+CREATE INDEX "OAuth2RefreshToken_clientId_idx" ON "OAuth2RefreshToken"("clientId");
+CREATE INDEX "OAuth2RefreshToken_expiresAt_idx" ON "OAuth2RefreshToken"("expiresAt");

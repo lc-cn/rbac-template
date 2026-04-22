@@ -217,7 +217,7 @@ async function seedOAuth2DemoClient() {
       secretHash,
       '示例第三方应用',
       redirectUrisJson,
-      'openid profile email',
+      'openid profile email offline_access',
       t,
       t,
     ],

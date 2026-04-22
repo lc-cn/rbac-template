@@ -1,0 +1,119 @@
+import { NextResponse } from 'next/server'
+import {
+  getOAuth2ClientByClientId,
+  isPublicClient,
+  parseRedirectUris,
+  redirectUriAllowed,
+  scopesAllowed,
+  type OAuth2ClientRow,
+} from '@/lib/oauth2/store'
+
+export function oauthErrRedirect(redirectUri: string, error: string, desc: string, state: string | null) {
+  const u = new URL(redirectUri)
+  u.searchParams.set('error', error)
+  u.searchParams.set('error_description', desc)
+  if (state) u.searchParams.set('state', state)
+  return NextResponse.redirect(u)
+}
+
+export type AuthorizeValidated = {
+  client: OAuth2ClientRow
+  responseType: string
+  clientId: string
+  redirectUri: string
+  scope: string
+  state: string | null
+  codeChallenge: string | null
+  codeChallengeMethod: string | null
+  nonce: string | null
+}
+
+/**
+ * 校验 OAuth2 授权请求查询参数（RFC 6749 / OIDC）。
+ * 成功时返回客户端行与规范化参数，失败时返回可直接响应的 NextResponse。
+ */
+export async function validateAuthorizeSearchParams(sp: URLSearchParams): Promise<
+  | { ok: true; data: AuthorizeValidated }
+  | { ok: false; response: NextResponse }
+> {
+  const responseType = sp.get('response_type')
+  const clientId = sp.get('client_id')
+  const redirectUri = sp.get('redirect_uri')
+  const scopeRaw = sp.get('scope')?.trim() || 'openid'
+  const state = sp.get('state')
+  const codeChallenge = sp.get('code_challenge')
+  const codeChallengeMethod = sp.get('code_challenge_method')
+  const nonce = sp.get('nonce')
+
+  if (responseType !== 'code') {
+    return { ok: false, response: NextResponse.json({ error: 'unsupported_response_type' }, { status: 400 }) }
+  }
+  if (!clientId || !redirectUri) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'invalid_request', error_description: '缺少 client_id 或 redirect_uri' },
+        { status: 400 }
+      ),
+    }
+  }
+
+  let client: OAuth2ClientRow | null
+  try {
+    client = await getOAuth2ClientByClientId(clientId)
+  } catch {
+    return { ok: false, response: NextResponse.json({ error: 'server_error' }, { status: 500 }) }
+  }
+  if (!client) {
+    return { ok: false, response: NextResponse.json({ error: 'invalid_client' }, { status: 400 }) }
+  }
+
+  const uris = parseRedirectUris(client.redirectUrisJson)
+  if (!redirectUriAllowed(redirectUri, uris)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'invalid_request', error_description: 'redirect_uri 未在客户端登记白名单内' },
+        { status: 400 }
+      ),
+    }
+  }
+
+  if (!scopesAllowed(scopeRaw, client.allowedScopes)) {
+    return { ok: false, response: oauthErrRedirect(redirectUri, 'invalid_scope', '请求的 scope 超出客户端允许范围', state) }
+  }
+
+  const pub = isPublicClient(client)
+  if (codeChallenge && codeChallengeMethod !== 'S256') {
+    return {
+      ok: false,
+      response: oauthErrRedirect(redirectUri, 'invalid_request', '使用 PKCE 时须为 code_challenge_method=S256', state),
+    }
+  }
+  if (pub && !codeChallenge) {
+    return {
+      ok: false,
+      response: oauthErrRedirect(
+        redirectUri,
+        'invalid_request',
+        '公开客户端必须使用 PKCE（code_challenge + code_challenge_method=S256）',
+        state
+      ),
+    }
+  }
+
+  return {
+    ok: true,
+    data: {
+      client,
+      responseType,
+      clientId,
+      redirectUri,
+      scope: scopeRaw,
+      state,
+      codeChallenge: codeChallenge || null,
+      codeChallengeMethod: codeChallengeMethod || null,
+      nonce,
+    },
+  }
+}

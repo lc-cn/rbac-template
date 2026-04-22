@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { getDb, newId, nowIso } from '@/lib/db'
 
@@ -119,6 +120,104 @@ export async function consumeAuthorizationCode(code: string): Promise<ConsumedCo
     codeChallengeMethod: row.codeChallengeMethod == null ? null : String(row.codeChallengeMethod),
     nonce: row.nonce == null ? null : String(row.nonce),
   }
+}
+
+export function hashOpaqueToken(plain: string): string {
+  return createHash('sha256').update(plain).digest('base64url')
+}
+
+export function newRefreshTokenPlain(): string {
+  return randomBytes(48).toString('base64url')
+}
+
+export async function insertRefreshTokenRow(params: {
+  plainToken: string
+  clientId: string
+  userId: string
+  scope: string
+  expiresAtIso: string
+}) {
+  const db = getDb()
+  const id = newId()
+  const tokenHash = hashOpaqueToken(params.plainToken)
+  await db.execute({
+    sql: `INSERT INTO "OAuth2RefreshToken" ("id","tokenHash","clientId","userId","scope","expiresAt")
+          VALUES (?,?,?,?,?,?)`,
+    args: [id, tokenHash, params.clientId, params.userId, params.scope, params.expiresAtIso],
+  })
+}
+
+export type ActiveRefreshRow = {
+  id: string
+  clientId: string
+  userId: string
+  scope: string
+  expiresAt: string
+}
+
+/** 查找未吊销且未过期的刷新令牌（introspection，不修改行） */
+export async function lookupRefreshTokenActive(plainToken: string): Promise<ActiveRefreshRow | null> {
+  const db = getDb()
+  const now = nowIso()
+  const tokenHash = hashOpaqueToken(plainToken)
+  const sel = await db.execute({
+    sql: `SELECT "id","clientId","userId","scope","expiresAt" FROM "OAuth2RefreshToken"
+          WHERE "tokenHash" = ? AND "expiresAt" > ? AND "revokedAt" IS NULL`,
+    args: [tokenHash, now],
+  })
+  const row = sel.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return null
+  return {
+    id: String(row.id),
+    clientId: String(row.clientId),
+    userId: String(row.userId),
+    scope: String(row.scope),
+    expiresAt: String(row.expiresAt),
+  }
+}
+
+/** 消费刷新令牌：标记吊销并返回行数据（用于 refresh_token 轮换） */
+export async function takeRefreshTokenForRotation(plainToken: string): Promise<ActiveRefreshRow | null> {
+  const db = getDb()
+  const now = nowIso()
+  const tokenHash = hashOpaqueToken(plainToken)
+  const sel = await db.execute({
+    sql: `SELECT "id","clientId","userId","scope","expiresAt" FROM "OAuth2RefreshToken"
+          WHERE "tokenHash" = ? AND "expiresAt" > ? AND "revokedAt" IS NULL`,
+    args: [tokenHash, now],
+  })
+  const row = sel.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return null
+  const id = String(row.id)
+  await db.execute({
+    sql: `UPDATE "OAuth2RefreshToken" SET "revokedAt" = ? WHERE "id" = ? AND "revokedAt" IS NULL`,
+    args: [now, id],
+  })
+  return {
+    id,
+    clientId: String(row.clientId),
+    userId: String(row.userId),
+    scope: String(row.scope),
+    expiresAt: String(row.expiresAt),
+  }
+}
+
+/** RFC 7009：吊销刷新令牌（幂等） */
+export async function revokeRefreshTokenByPlain(plainToken: string): Promise<boolean> {
+  const db = getDb()
+  const now = nowIso()
+  const tokenHash = hashOpaqueToken(plainToken)
+  const sel = await db.execute({
+    sql: `SELECT "id" FROM "OAuth2RefreshToken" WHERE "tokenHash" = ? AND "revokedAt" IS NULL`,
+    args: [tokenHash],
+  })
+  const row = sel.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return false
+  await db.execute({
+    sql: `UPDATE "OAuth2RefreshToken" SET "revokedAt" = ? WHERE "id" = ?`,
+    args: [now, String(row.id)],
+  })
+  return true
 }
 
 export async function getUserClaimsForToken(userId: string): Promise<{

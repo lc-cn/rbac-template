@@ -1,5 +1,47 @@
-import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
+import { createPrivateKey } from 'node:crypto'
+import { decodeProtectedHeader, exportJWK, importPKCS8, importSPKI, jwtVerify, SignJWT, type JWTPayload, type JWK } from 'jose'
 import { getOAuthIssuer } from '@/lib/oauth2/issuer'
+
+const RSA_KID = 'oauth-rsa-1'
+
+function loadPemPrivate(): string | null {
+  const b64 = process.env.OAUTH_RSA_PRIVATE_KEY_B64?.trim()
+  if (b64) {
+    try {
+      return Buffer.from(b64, 'base64').toString('utf8')
+    } catch {
+      return null
+    }
+  }
+  const pem = process.env.OAUTH_RSA_PRIVATE_KEY_PEM?.trim()
+  if (pem) {
+    return pem.replace(/\\n/g, '\n')
+  }
+  return null
+}
+
+type RsaCached = { privateKey: Awaited<ReturnType<typeof importPKCS8>>; publicSpkiPem: string }
+let rsaCache: RsaCached | null | undefined
+
+async function getRsaMaterial(): Promise<RsaCached | null> {
+  if (rsaCache === null) return null
+  if (rsaCache) return rsaCache
+  const pem = loadPemPrivate()
+  if (!pem) {
+    rsaCache = null
+    return null
+  }
+  try {
+    const pk = createPrivateKey(pem)
+    const publicSpkiPem = pk.export({ type: 'spki', format: 'pem' }) as string
+    const privateKey = await importPKCS8(pem, 'RS256')
+    rsaCache = { privateKey, publicSpkiPem }
+    return rsaCache
+  } catch {
+    rsaCache = null
+    return null
+  }
+}
 
 function secretKey(): Uint8Array {
   const raw = (process.env.OAUTH_JWT_SECRET || process.env.NEXTAUTH_SECRET || '').trim()
@@ -9,12 +51,39 @@ function secretKey(): Uint8Array {
   return new TextEncoder().encode(raw)
 }
 
+/** Discovery：当前支持的 id_token / access_token 签名算法列表 */
+export function oauthSigningAlgsSupported(): string[] {
+  return loadPemPrivate() ? ['RS256', 'HS256'] : ['HS256']
+}
+
+export async function getOAuthJwks(): Promise<{ keys: JWK[] }> {
+  const rsa = await getRsaMaterial()
+  if (!rsa) return { keys: [] }
+  const pub = await importSPKI(rsa.publicSpkiPem, 'RS256')
+  const jwk = await exportJWK(pub)
+  jwk.kid = RSA_KID
+  jwk.use = 'sig'
+  jwk.alg = 'RS256'
+  return { keys: [jwk] }
+}
+
 export async function signAccessToken(params: {
   sub: string
   aud: string
   scope: string
 }): Promise<string> {
   const issuer = getOAuthIssuer()
+  const rsa = await getRsaMaterial()
+  if (rsa) {
+    return new SignJWT({ scope: params.scope, token_use: 'access' })
+      .setProtectedHeader({ alg: 'RS256', kid: RSA_KID })
+      .setIssuer(issuer)
+      .setSubject(params.sub)
+      .setAudience(params.aud)
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(rsa.privateKey)
+  }
   return new SignJWT({ scope: params.scope, token_use: 'access' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(issuer)
@@ -40,6 +109,17 @@ export async function signIdToken(params: {
   if (params.picture != null) body.picture = params.picture
   if (params.nonce) body.nonce = params.nonce
 
+  const rsa = await getRsaMaterial()
+  if (rsa) {
+    return new SignJWT(body)
+      .setProtectedHeader({ alg: 'RS256', kid: RSA_KID })
+      .setIssuer(issuer)
+      .setSubject(params.sub)
+      .setAudience(params.aud)
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(rsa.privateKey)
+  }
   return new SignJWT(body)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(issuer)
@@ -52,10 +132,30 @@ export async function signIdToken(params: {
 
 export async function verifyAccessToken(token: string): Promise<JWTPayload> {
   const issuer = getOAuthIssuer()
-  const { payload } = await jwtVerify(token, secretKey(), {
-    issuer,
-    algorithms: ['HS256'],
-  })
-  if (payload.token_use !== 'access') throw new Error('invalid token type')
-  return payload
+  let alg: string
+  try {
+    alg = decodeProtectedHeader(token).alg ?? ''
+  } catch {
+    throw new Error('invalid token')
+  }
+  if (alg === 'RS256') {
+    const rsa = await getRsaMaterial()
+    if (!rsa) throw new Error('invalid token alg')
+    const pub = await importSPKI(rsa.publicSpkiPem, 'RS256')
+    const { payload } = await jwtVerify(token, pub, {
+      issuer,
+      algorithms: ['RS256'],
+    })
+    if (payload.token_use !== 'access') throw new Error('invalid token type')
+    return payload
+  }
+  if (alg === 'HS256') {
+    const { payload } = await jwtVerify(token, secretKey(), {
+      issuer,
+      algorithms: ['HS256'],
+    })
+    if (payload.token_use !== 'access') throw new Error('invalid token type')
+    return payload
+  }
+  throw new Error('unsupported alg')
 }

@@ -1,0 +1,70 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { randomBytes } from 'node:crypto'
+import { getServerAuthSession } from '@/lib/session'
+import { insertAuthorizationCode } from '@/lib/oauth2/store'
+import { oauthErrRedirect, validateAuthorizeSearchParams } from '@/lib/oauth2/validate-authorize'
+
+/**
+ * 用户同意 / 拒绝授权后签发授权码（RFC 6749）。
+ */
+export async function POST(req: NextRequest) {
+  let body: URLSearchParams
+  try {
+    body = new URLSearchParams(await req.text())
+  } catch {
+    return NextResponse.json({ error: 'invalid_request', error_description: '无法解析请求体' }, { status: 400 })
+  }
+
+  const action = body.get('action')
+  const sp = new URLSearchParams()
+  for (const key of [
+    'response_type',
+    'client_id',
+    'redirect_uri',
+    'scope',
+    'state',
+    'code_challenge',
+    'code_challenge_method',
+    'nonce',
+  ] as const) {
+    const v = body.get(key)
+    if (v != null) sp.set(key, v)
+  }
+
+  const validated = await validateAuthorizeSearchParams(sp)
+  if (!validated.ok) return validated.response
+
+  const { client, redirectUri, scope, state, codeChallenge, codeChallengeMethod, nonce } = validated.data
+
+  const session = await getServerAuthSession()
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
+  if (action === 'deny') {
+    return oauthErrRedirect(redirectUri, 'access_denied', '用户拒绝授权', state)
+  }
+
+  if (action !== 'approve') {
+    return NextResponse.json({ error: 'invalid_request', error_description: '无效 action' }, { status: 400 })
+  }
+
+  const code = randomBytes(32).toString('base64url')
+  const exp = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+  await insertAuthorizationCode({
+    code,
+    clientId: client.clientId,
+    userId: session.user.id as string,
+    redirectUri,
+    scope,
+    expiresAtIso: exp,
+    codeChallenge,
+    codeChallengeMethod,
+    nonce,
+  })
+
+  const ok = new URL(redirectUri)
+  ok.searchParams.set('code', code)
+  if (state) ok.searchParams.set('state', state)
+  return NextResponse.redirect(ok)
+}
