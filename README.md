@@ -198,9 +198,10 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 
 部署后请将 `{NEXTAUTH_URL}` 换成你的站点根地址（与 `OAUTH_ISSUER_URL` 一致更佳）：
 
-- **OAuth2 / OIDC 客户端对接指南**：部署后访问 **`/docs/oauth2`**（示例：`http://localhost:3000/docs/oauth2`）
+- **开发者文档首页**：**`/docs`**（概览与接入入口；示例：`http://localhost:3000/docs`）
+- **OAuth2 / OIDC 客户端接入指南**：**`/docs/oauth2`**（示例：`http://localhost:3000/docs/oauth2`）
 
-文档内容从运行时读取 `issuer` 与支持的签名算法，便于复制端点示例。中间件已放行 `/docs/**`，无需登录管理后台即可阅读。
+接入指南页会从运行时读取 `issuer` 与支持的签名算法，便于复制端点示例。中间件已放行 `/docs/**`，无需登录管理后台即可阅读；**登录页**提供前往 **`/docs`** 的引导入口。
 
 ### 对外端点（摘要）
 

@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { getProviders, signIn } from 'next-auth/react'
+import { BookOpen, ChevronRight } from 'lucide-react'
 import { useI18n } from '@/i18n/context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -165,6 +167,28 @@ export function LoginForm() {
           </div>
         )}
       </div>
+
+      <aside
+        className="mt-8 rounded-2xl border border-border/60 bg-gradient-to-br from-muted/40 via-card to-muted/20 p-5 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05] sm:p-6"
+        aria-label={t('login.docsCtaTitle')}
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <BookOpen className="h-5 w-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground">{t('login.docsCtaBadge')}</p>
+            <h2 className="text-sm font-semibold leading-snug text-foreground">{t('login.docsCtaTitle')}</h2>
+            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">{t('login.docsCtaDesc')}</p>
+            <Button variant="outline" size="sm" className="mt-1 h-9 gap-1 border-primary/25 text-primary hover:bg-primary/5" asChild>
+              <Link href="/docs">
+                {t('login.docsCtaLink')}
+                <ChevronRight className="h-4 w-4 opacity-80" aria-hidden />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </aside>
     </div>
   )
 }

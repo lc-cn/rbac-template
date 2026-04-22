@@ -324,5 +324,10 @@ export const en: Messages = {
     errorCredentials: 'Invalid email or password',
     errorGeneric: 'Sign-in failed. Try again.',
     errorOAuthSignin: 'OAuth sign-in failed. Check provider settings and redirect URLs.',
+    docsCtaBadge: 'Developers',
+    docsCtaTitle: 'Platform integration docs',
+    docsCtaDesc:
+      'Integrating your applications with this site’s OAuth 2.0 / OpenID Connect capabilities? Browse the public technical guide—no sign-in required for the documentation pages.',
+    docsCtaLink: 'View integration guide',
   },
 }

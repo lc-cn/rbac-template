@@ -319,6 +319,11 @@ export const zh = {
     errorCredentials: '邮箱或密码错误',
     errorGeneric: '登录失败，请稍后重试',
     errorOAuthSignin: '第三方登录失败，请检查 OAuth 配置与回调 URL',
+    docsCtaBadge: '开发者',
+    docsCtaTitle: '开放平台 · 接入文档',
+    docsCtaDesc:
+      '若您正在将业务系统与本站身份能力对接（OAuth2 / OIDC），可查阅公开技术文档，无需登录即可浏览端点说明与安全清单。',
+    docsCtaLink: '查看接入文档',
   },
 } as const
 
