@@ -5,6 +5,7 @@
 import 'dotenv/config'
 import { createClient } from '@libsql/client'
 import { randomUUID } from 'node:crypto'
+import bcrypt from 'bcryptjs'
 
 const url = process.env.DATABASE_URL?.trim()
 if (!url?.startsWith('libsql:')) {
@@ -188,8 +189,42 @@ async function main() {
   await upsertSystemConfig('admin_email', 'admin@example.com', 'general', '管理员邮箱')
   await upsertSystemConfig('session_timeout', '3600', 'general', '会话超时(秒)')
 
+  await seedOAuth2DemoClient()
+
   console.log('数据初始化完成!')
   console.log('管理员账号: admin@example.com / admin123')
+}
+
+/** 机密型 OAuth2 客户端示例（第三方站点对接用，生产务必改密与 redirect） */
+async function seedOAuth2DemoClient() {
+  const clientId = 'rbac_demo_client'
+  const existing = await db.execute({ sql: `SELECT "id" FROM "OAuth2Client" WHERE "clientId" = ?`, args: [clientId] })
+  if (existing.rows[0]) return
+
+  const id = randomUUID()
+  const t = now()
+  const secretHash = bcrypt.hashSync('demo_secret_please_change', 10)
+  const redirectUrisJson = JSON.stringify([
+    'http://localhost:5173/oauth/callback',
+    'http://127.0.0.1:5173/oauth/callback',
+  ])
+  await db.execute({
+    sql: `INSERT INTO "OAuth2Client" ("id","clientId","clientSecretHash","name","redirectUrisJson","allowedScopes","createdAt","updatedAt")
+          VALUES (?,?,?,?,?,?,?,?)`,
+    args: [
+      id,
+      clientId,
+      secretHash,
+      '示例第三方应用',
+      redirectUrisJson,
+      'openid profile email',
+      t,
+      t,
+    ],
+  })
+  console.log(
+    '已注册 OAuth2 示例客户端 client_id=rbac_demo_client，client_secret=demo_secret_please_change，回调见 redirectUrisJson'
+  )
 }
 
 main()

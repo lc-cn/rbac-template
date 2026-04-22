@@ -37,6 +37,7 @@
 | `pnpm run typecheck` | TypeScript 检查 |
 | `pnpm run lint` | ESLint |
 | `pnpm run db:apply-sql` | 将 `sql/schema.sql` 应用到 `DATABASE_URL` 指向的库（默认文件路径；可传参：`pnpm run db:apply-sql /path/to.sql`） |
+| `pnpm run db:apply-sql sql/migrations/002_oauth2_authorization_server.sql` | 旧库仅补 OAuth2 表时使用（新库已含于 `sql/schema.sql`） |
 | `pnpm run seed` | 写入初始数据（依赖 `.env` 中 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`） |
 
 ---
@@ -165,19 +166,116 @@ turso db shell <数据库名> < sql/schema.sql
 | `NEXTAUTH_URL` | NextAuth | 生产与 OAuth **强烈建议** | 站点根 URL，无末尾 `/` |
 | `NEXTAUTH_SECRET` | NextAuth | **生产必填** | 会话/JWT 签名；可用 `openssl rand -base64 32` |
 | `AUTH_SECRET` | NextAuth | 可选 | 与 `NEXTAUTH_SECRET` 二选一；同时存在时 **优先 `NEXTAUTH_SECRET`** |
+| `OAUTH_ISSUER_URL` | 自建 IdP Discovery / JWT `iss` | 可选 | 与 `NEXTAUTH_URL` 不同时配置（须无末尾 `/`） |
+| `OAUTH_JWT_SECRET` | 自建 IdP 签发 access/id token | 可选 | ≥32 字符；未设则使用 `NEXTAUTH_SECRET` |
 
 ---
 
 ## 仓库结构（与数据相关）
 
 ```
-sql/schema.sql              # 建表 + 索引 DDL
+sql/schema.sql              # 建表 + 索引 DDL（含 OAuth2 授权服务器表）
+sql/migrations/002_oauth2_authorization_server.sql  # 仅给已存在旧库增量补表
 scripts/apply-schema-sql.mjs   # 将 SQL 文件批量执行到 DATABASE_URL
-scripts/seed.mjs            # 种子数据（Node，读 dotenv）
+scripts/seed.mjs            # 种子数据（Node，读 dotenv；含示例 OAuth2 Client）
 src/lib/db.ts               # LibSQL 客户端单例、工具函数
 src/lib/data-access.ts      # 业务 SQL / 聚合查询
 src/lib/next-auth-libsql-adapter.ts  # NextAuth Database Adapter（LibSQL）
+src/lib/oauth2/             # 自建 IdP：issuer、JWT、PKCE、授权码存储
+src/app/oauth/              # /oauth/authorize、/oauth/token、/oauth/userinfo
+src/app/.well-known/openid-configuration/  # OIDC Discovery
 ```
+
+---
+
+## 自建 OAuth2 / OIDC 授权服务器（已实现最小可用）
+
+本仓库已实现 **授权码模式（RFC 6749）** + **OIDC Discovery** + **`userinfo`** + **PKCE（RFC 7636）**，由本系统作为 **授权服务器（AS）**，第三方站点注册为 **OAuth2 Client** 后即可引导用户登录并换 token。
+
+### 对外端点
+
+| 端点 | 说明 |
+|------|------|
+| `GET /.well-known/openid-configuration` | OIDC Provider 元数据（`issuer`、`authorization_endpoint`、`token_endpoint` 等） |
+| `GET /oauth/authorize` | 授权请求；未登录会跳转 `/login?callbackUrl=...`，登录后回到此处签发 `code` |
+| `POST /oauth/token` | `grant_type=authorization_code`，`application/x-www-form-urlencoded` |
+| `GET /oauth/userinfo` | `Authorization: Bearer <access_token>` |
+
+**Issuer**：优先读环境变量 `OAUTH_ISSUER_URL`，否则使用 `NEXTAUTH_URL`（须为对外可访问的根 URL，无末尾 `/`）。**JWT**：`OAUTH_JWT_SECRET`（≥32 字符）优先，否则回退 `NEXTAUTH_SECRET`。当前 **`id_token` / `access_token` 均为 HS256**；对接方若以 JWKS 验签 RS256，需后续迭代（见下文愿景）。
+
+### 客户端类型
+
+| 类型 | `OAuth2Client.clientSecretHash` | 授权 / 换 token 要求 |
+|------|--------------------------------|------------------------|
+| **机密（confidential）** | 非空（bcrypt 存哈希） | 换 token 时校验 `client_secret`（表单或 HTTP Basic）；授权端可选 PKCE；若授权时带了 `code_challenge`，换 token 必须带正确 `code_verifier` |
+| **公开（public）** | `NULL` | 授权与换 token **必须 PKCE**（`code_challenge` + `code_challenge_method=S256`） |
+
+`redirect_uri` 必须与库中 `redirectUrisJson`（JSON 字符串数组）**完全一致**（含端口、路径、`http`/`https`）。
+
+### 种子中的示例客户端
+
+执行 `pnpm run seed` 后会插入（若不存在）：
+
+- `client_id`: **`rbac_demo_client`**
+- `client_secret`: **`demo_secret_please_change`**
+- 允许的 `redirect_uri`：`http://localhost:5173/oauth/callback`、`http://127.0.0.1:5173/oauth/callback`（可按需在库里改 `redirectUrisJson`）
+
+生产环境请**删除或改密**，并登记真实业务域名回调。
+
+### 第三方站点对接流程（摘要）
+
+1. `GET /.well-known/openid-configuration` 拉元数据。  
+2. 302 用户到 `authorization_endpoint?response_type=code&client_id=...&redirect_uri=...&scope=openid%20profile%20email&state=...&code_challenge=...&code_challenge_method=S256&nonce=...`。  
+3. 用户在本站登录后，浏览器带 `code` 回到 `redirect_uri`。  
+4. 业务站 **服务端** `POST token_endpoint`，`grant_type=authorization_code&code=...&redirect_uri=...&client_id=...&client_secret=...`（机密客户端）并附 `code_verifier`（若使用 PKCE）。  
+5. 解析 JSON 中的 `access_token`；若 scope 含 `openid`，还有 `id_token`（JWT）。可选 `GET userinfo_endpoint` 用 Bearer `access_token` 拉用户信息。
+
+**尚未实现（后续可增强）**：同意页（Consent）、Refresh Token、`/oauth/register` 动态注册、**RS256 + JWKS**、撤销与 introspection、管理后台维护 Client 的 UI。
+
+---
+
+## 愿景：统一 SSO / OAuth2，供多站点「一键登录」
+
+目标形态：**本系统作为身份提供方（IdP）**，各业务站点作为 **OAuth2 / OpenID Connect 的客户端（Client / RP）**。用户在本系统登录（或已登录）后，跳转回业务站时携带 **授权码**，业务站用 **Client Secret**（机密客户端）或 **PKCE**（公开客户端）换 **Access Token / ID Token**，从而完成「一键登录」并与本系统账号绑定。
+
+### 与当前能力的关系
+
+- **对本站用户**：仍用 **NextAuth** 登录（邮箱密码 / GitHub / Google），会话为 **JWT**；访问 `/oauth/authorize` 时沿用该会话决定是否已登录。  
+- **对第三方站点**：已通过上一节 **自建 OAuth2/OIDC 端点** 对外签发 **授权码与 token**；NextAuth 仍可作为 **联邦登录**（去 GitHub/Google 拉账号），与「本系统当 IdP」并存。  
+- **尚未覆盖**：同意页、Refresh、RS256/JWKS、动态注册等，见上文「尚未实现」与下表 **P2/P3**。
+
+### 推荐技术路线（择一或组合）
+
+1. **在本仓库内自建 OIDC Provider（深度定制）**  
+   使用成熟 AS 库（如基于 Node 的 **OIDC Provider** 类方案）挂载到 Next 的 Route Handlers 或独立子域服务，用户与权限仍用现有 LibSQL。工作量大，但品牌与数据完全自控。
+
+2. **外置专用 IdP + 本系统做管理控制台（上线快）**  
+   使用 [Keycloak](https://www.keycloak.org/)、[Zitadel](https://zitadel.com/)、[Authentik](https://goauthentik.io/) 等作为授权服务器；本模板演化为 **「账号/应用/权限管理后台」** 通过 IdP Admin API 同步用户，或只做策略与审计。多站 SSO 协议由 IdP 保证，符合「统一 SSO」预期且省协议细节。
+
+3. **混合**  
+   短期用外置 IdP 满足各站对接；长期把用户目录与客户端注册逐步收到自研 AS，降低双系统同步成本。
+
+### 第三方站点对接时的大致步骤（目标架构下）
+
+1. 在本系统（或 IdP）**注册 OAuth 客户端**：获得 `client_id` / `client_secret`（或仅 PKCE 的公开客户端），登记允许的 **`redirect_uri` 白名单**。
+2. 用户从业务站点击「使用某某账号登录」→ 302 到本系统 **`/authorize?...`**。
+3. 用户未登录则在本系统登录；已登录可跳过或只展示 **同意授权** 页。
+4. 用户同意后 302 回业务站 `redirect_uri?code=...&state=...`。
+5. 业务站 **服务端** 用 `code` 调用 **`/token`**，换 `access_token` +（若 OIDC）`id_token`。
+6. 用 `id_token` 解析 `sub`（稳定用户标识）或调用 **`/userinfo`**，在业务站创建/关联本地用户，完成会话。
+
+安全要点：**`state` 防 CSRF**、机密客户端保护 **`client_secret`**、公开客户端强制 **PKCE**、**redirect_uri** 不允许通配符滥用、**Refresh Token** 轮换与吊销策略。
+
+### 建议实施阶段（路线图）
+
+| 阶段 | 内容 | 状态 |
+|------|------|------|
+| **P0** | 稳定本系统账号体系、HTTPS、固定 `NEXTAUTH_URL` / `OAUTH_ISSUER_URL` | 持续 |
+| **P1** | OAuth2 客户端与授权码表；**授权码 + Token**；Discovery；UserInfo；PKCE；机密/公开客户端 | **已落地最小实现**（见上一节） |
+| **P2** | **同意页（Consent）**、Refresh Token、**RS256 + `jwks_uri`**、令牌吊销 / introspection、管理后台维护 Client | 待做 |
+| **P3** | **SLO**、设备会话、审计与告警；可选 **SAML 2.0** | 待做 |
+
+若你希望下一步优先 **管理后台维护 OAuth2 Client** 或 **RS256 密钥轮换**，可单独开需求拆任务。
 
 ---
 

@@ -10,6 +10,13 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith('/api/auth')) {
     return NextResponse.next()
   }
+  // 自建 OAuth2/OIDC：令牌与元数据端点不依赖本站登录 Cookie
+  if (pathname.startsWith('/.well-known')) {
+    return NextResponse.next()
+  }
+  if (pathname === '/oauth/token' || pathname === '/oauth/userinfo') {
+    return NextResponse.next()
+  }
 
   const token = await getToken({ req, secret })
   const isLogin = pathname === '/login'

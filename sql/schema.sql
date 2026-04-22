@@ -134,3 +134,34 @@ CREATE UNIQUE INDEX "Feature_applicationId_code_key" ON "Feature"("applicationId
 CREATE UNIQUE INDEX "Permission_code_key" ON "Permission"("code");
 CREATE UNIQUE INDEX "SystemConfig_key_key" ON "SystemConfig"("key");
 CREATE UNIQUE INDEX "OAuthProvider_name_key" ON "OAuthProvider"("name");
+
+-- 自建 OAuth2 / OIDC：第三方站点作为 Client，本系统作为授权服务器
+CREATE TABLE "OAuth2Client" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "clientId" TEXT NOT NULL,
+    "clientSecretHash" TEXT,
+    "name" TEXT NOT NULL,
+    "redirectUrisJson" TEXT NOT NULL,
+    "allowedScopes" TEXT NOT NULL DEFAULT 'openid profile email',
+    "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+    "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE "OAuth2AuthorizationCode" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "code" TEXT NOT NULL,
+    "clientId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "redirectUri" TEXT NOT NULL,
+    "scope" TEXT NOT NULL,
+    "expiresAt" TEXT NOT NULL,
+    "codeChallenge" TEXT,
+    "codeChallengeMethod" TEXT,
+    "nonce" TEXT,
+    "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "OAuth2AuthorizationCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX "OAuth2Client_clientId_key" ON "OAuth2Client"("clientId");
+CREATE UNIQUE INDEX "OAuth2AuthorizationCode_code_key" ON "OAuth2AuthorizationCode"("code");
+CREATE INDEX "OAuth2AuthorizationCode_expiresAt_idx" ON "OAuth2AuthorizationCode"("expiresAt");
