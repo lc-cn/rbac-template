@@ -182,26 +182,39 @@ src/lib/db.ts               # LibSQL 客户端单例、工具函数
 src/lib/data-access.ts      # 业务 SQL / 聚合查询
 src/lib/next-auth-libsql-adapter.ts  # NextAuth Database Adapter（LibSQL）
 src/lib/oauth2/             # 自建 IdP：issuer、JWT、PKCE、授权码存储
-src/app/oauth/              # /oauth/authorize、/oauth/token、/oauth/userinfo
+src/app/oauth/              # /oauth/authorize、/oauth/token、/oauth/userinfo 等
+src/app/docs/oauth2/        # 对外 OAuth2 对接文档（/docs/oauth2，免登录）
 src/app/.well-known/openid-configuration/  # OIDC Discovery
 ```
 
 ---
 
-## 自建 OAuth2 / OIDC 授权服务器（已实现最小可用）
+## 自建 OAuth2 / OIDC 授权服务器
 
-本仓库已实现 **授权码模式（RFC 6749）** + **OIDC Discovery** + **`userinfo`** + **PKCE（RFC 7636）**，由本系统作为 **授权服务器（AS）**，第三方站点注册为 **OAuth2 Client** 后即可引导用户登录并换 token。
+本仓库已实现 **授权码模式（RFC 6749）** + **OIDC Discovery** + **同意页** + **`userinfo`** + **PKCE（RFC 7636）** + **refresh_token** + **吊销 / 自省** + **RP 登出入口**，由本系统作为 **授权服务器（AS）**，第三方站点注册为 **OAuth2 Client** 后即可引导用户登录并换 token。
 
-### 对外端点
+### 对接文档（对外 · 免登录）
+
+部署后请将 `{NEXTAUTH_URL}` 换成你的站点根地址（与 `OAUTH_ISSUER_URL` 一致更佳）：
+
+- **OAuth2 / OIDC 客户端对接指南**：部署后访问 **`/docs/oauth2`**（示例：`http://localhost:3000/docs/oauth2`）
+
+文档内容从运行时读取 `issuer` 与支持的签名算法，便于复制端点示例。中间件已放行 `/docs/**`，无需登录管理后台即可阅读。
+
+### 对外端点（摘要）
 
 | 端点 | 说明 |
 |------|------|
-| `GET /.well-known/openid-configuration` | OIDC Provider 元数据（`issuer`、`authorization_endpoint`、`token_endpoint` 等） |
-| `GET /oauth/authorize` | 授权请求；未登录会跳转 `/login?callbackUrl=...`，登录后回到此处签发 `code` |
-| `POST /oauth/token` | `grant_type=authorization_code`，`application/x-www-form-urlencoded` |
+| `GET /.well-known/openid-configuration` | OIDC Provider 元数据（`issuer`、`authorization_endpoint`、`token_endpoint`、`end_session_endpoint`、`jwks_uri` 等） |
+| `GET /.well-known/jwks.json` | JWKS（配置 RSA 私钥环境变量后非空） |
+| `GET /oauth/authorize` | 授权请求；未登录跳转 `/login`；已登录进入同意页后发 `code` |
+| `POST /oauth/token` | `authorization_code`、`refresh_token`（`application/x-www-form-urlencoded`） |
 | `GET /oauth/userinfo` | `Authorization: Bearer <access_token>` |
+| `POST /oauth/revoke` | RFC 7009，吊销 refresh_token（见文档） |
+| `POST /oauth/introspect` | RFC 7662 |
+| `GET /oauth/logout` | OIDC 登出；校验 `post_logout_redirect_uri` 后走 NextAuth 登出 |
 
-**Issuer**：优先读环境变量 `OAUTH_ISSUER_URL`，否则使用 `NEXTAUTH_URL`（须为对外可访问的根 URL，无末尾 `/`）。**JWT**：`OAUTH_JWT_SECRET`（≥32 字符）优先，否则回退 `NEXTAUTH_SECRET`。当前 **`id_token` / `access_token` 均为 HS256**；对接方若以 JWKS 验签 RS256，需后续迭代（见下文愿景）。
+**Issuer**：优先读环境变量 `OAUTH_ISSUER_URL`，否则使用 `NEXTAUTH_URL`（须为对外可访问的根 URL，无末尾 `/`）。**JWT**：默认 **HS256**（`OAUTH_JWT_SECRET` / `NEXTAUTH_SECRET`）；可选配置 **RS256**（`OAUTH_RSA_PRIVATE_KEY_B64` 或 `OAUTH_RSA_PRIVATE_KEY_PEM`，详见 `.env.example`），此时 Discovery 会带 `jwks_uri`。
 
 ### 客户端类型
 
@@ -224,13 +237,15 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 
 ### 第三方站点对接流程（摘要）
 
-1. `GET /.well-known/openid-configuration` 拉元数据。  
-2. 302 用户到 `authorization_endpoint?response_type=code&client_id=...&redirect_uri=...&scope=openid%20profile%20email&state=...&code_challenge=...&code_challenge_method=S256&nonce=...`。  
-3. 用户在本站登录后，浏览器带 `code` 回到 `redirect_uri`。  
-4. 业务站 **服务端** `POST token_endpoint`，`grant_type=authorization_code&code=...&redirect_uri=...&client_id=...&client_secret=...`（机密客户端）并附 `code_verifier`（若使用 PKCE）。  
-5. 解析 JSON 中的 `access_token`；若 scope 含 `openid`，还有 `id_token`（JWT）。可选 `GET userinfo_endpoint` 用 Bearer `access_token` 拉用户信息。
+完整步骤、表单字段与安全清单见 **对接文档 `/docs/oauth2`**（与站点同域打开即可）。摘要如下：
 
-**尚未实现（后续可增强）**：同意页（Consent）、Refresh Token、`/oauth/register` 动态注册、**RS256 + JWKS**、撤销与 introspection、管理后台维护 Client 的 UI。
+1. `GET /.well-known/openid-configuration` 拉元数据。  
+2. 302 用户到 `authorization_endpoint?response_type=code&client_id=...&redirect_uri=...&scope=...&state=...&code_challenge=...&code_challenge_method=S256&nonce=...`（公开客户端必须 PKCE）。  
+3. 用户在本站登录并 **同意授权** 后，浏览器带 `code` 回到 `redirect_uri`。  
+4. 业务站 **服务端** `POST token_endpoint`，`grant_type=authorization_code&code=...&redirect_uri=...&client_id=...&client_secret=...`（机密客户端）并附 `code_verifier`（若使用 PKCE）。  
+5. 解析 JSON 中的 `access_token`；若 scope 含 `openid`，还有 `id_token`（JWT）。需要长会话时可请求 `offline_access` 并取得 `refresh_token`（须在后台客户端启用 refresh 授权）。可选 `GET userinfo_endpoint`。
+
+**尚未实现（可选增强）**：`/oauth/register` 动态客户端注册、设备授权等扩展流程。
 
 ---
 
@@ -242,7 +257,7 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 
 - **对本站用户**：仍用 **NextAuth** 登录（邮箱密码 / GitHub / Google），会话为 **JWT**；访问 `/oauth/authorize` 时沿用该会话决定是否已登录。  
 - **对第三方站点**：已通过上一节 **自建 OAuth2/OIDC 端点** 对外签发 **授权码与 token**；NextAuth 仍可作为 **联邦登录**（去 GitHub/Google 拉账号），与「本系统当 IdP」并存。  
-- **尚未覆盖**：同意页、Refresh、RS256/JWKS、动态注册等，见上文「尚未实现」与下表 **P2/P3**。
+- **已覆盖**：同意页、Refresh、RS256/JWKS（可选）、吊销、自省、管理后台维护 Client、登出入口；未覆盖动态注册等见上文。
 
 ### 推荐技术路线（择一或组合）
 
@@ -272,10 +287,10 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 |------|------|------|
 | **P0** | 稳定本系统账号体系、HTTPS、固定 `NEXTAUTH_URL` / `OAUTH_ISSUER_URL` | 持续 |
 | **P1** | OAuth2 客户端与授权码表；**授权码 + Token**；Discovery；UserInfo；PKCE；机密/公开客户端 | **已落地最小实现**（见上一节） |
-| **P2** | **同意页（Consent）**、Refresh Token、**RS256 + `jwks_uri`**、令牌吊销 / introspection、管理后台维护 Client | 待做 |
-| **P3** | **SLO**、设备会话、审计与告警；可选 **SAML 2.0** | 待做 |
+| **P2** | 同意页、Refresh、RS256 + `jwks_uri`、吊销 / introspection、管理后台 Client、登出 | **已落地**（细节见 `/docs/oauth2`） |
+| **P3** | 设备授权、动态注册、更强 SLO/审计、可选 **SAML 2.0** | 规划 |
 
-若你希望下一步优先 **管理后台维护 OAuth2 Client** 或 **RS256 密钥轮换**，可单独开需求拆任务。
+若你希望下一步优先 **动态客户端注册** 或 **密钥轮换运维**，可单独开需求拆任务。
 
 ---
 

@@ -14,6 +14,10 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith('/.well-known')) {
     return NextResponse.next()
   }
+  // 对外技术文档（OAuth2 对接说明），无需登录
+  if (pathname.startsWith('/docs')) {
+    return NextResponse.next()
+  }
   if (
     pathname === '/oauth/token' ||
     pathname === '/oauth/userinfo' ||
