@@ -1,151 +1,186 @@
 # RBAC Template
 
-基于 Next.js 16 App Router、**@libsql/client**（直连 SQL）、Tailwind CSS 和 shadcn/ui 构建的全栈 RBAC（基于角色的访问控制）管理系统。
+基于 **Next.js 16**（App Router）、**@libsql/client**（直连 SQL + 轻量数据层）、**Tailwind CSS v4** 与 **shadcn/ui** 的全栈 **RBAC**（基于角色的访问控制）后台模板。认证使用 **NextAuth v4**（邮箱密码 + GitHub / Google OAuth）。
+
+---
 
 ## 功能
 
 - 用户管理（CRUD + 多角色分配）
 - 角色管理（CRUD + 权限分配）
-- 权限管理（按应用分组）
-- 应用 / 功能模块管理
-- 系统配置（通用 k/v + OAuth2 提供商，与登录页联动）
-- 登录（邮箱密码 + 已启用的 GitHub / Google OAuth2）
+- 权限管理（按应用 / 功能分组）
+- 应用与功能模块管理
+- 系统配置（通用 k/v + OAuth2 提供商表，与登录页联动）
+- 登录：邮箱密码；已启用且凭证非占位的 **GitHub / Google** 会出现在登录页
+
+---
 
 ## 技术栈
 
-- **框架**：Next.js 16 App Router
-- **数据库**：[Turso](https://turso.tech) / LibSQL（[`@libsql/client`](https://github.com/tursodatabase/libsql-client-ts) 手写 SQL + 轻量 DAL）
-- **UI**：Tailwind CSS v4 + shadcn/ui
+| 层级 | 选型 |
+|------|------|
+| 框架 | Next.js 16 App Router、React 19 |
+| 数据库 | [Turso](https://turso.tech) / LibSQL，[`@libsql/client`](https://github.com/tursodatabase/libsql-client-ts) |
+| 数据访问 | `src/lib/data-access.ts`（手写 SQL）；NextAuth 适配器见 `src/lib/next-auth-libsql-adapter.ts` |
+| 认证 | NextAuth v4（JWT Session + 自定义 LibSQL Adapter） |
+| UI | Tailwind CSS v4、shadcn/ui、next-themes、站内 i18n（中/英） |
 
-## 快速开始（本地开发）
+---
+
+## 常用脚本
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 本地开发 |
+| `pnpm run build` | 生产构建（无 Prisma，仅 `next build`） |
+| `pnpm start` | 启动生产构建产物 |
+| `pnpm run typecheck` | TypeScript 检查 |
+| `pnpm run lint` | ESLint |
+| `pnpm run db:apply-sql` | 将 `sql/schema.sql` 应用到 `DATABASE_URL` 指向的库（默认文件路径；可传参：`pnpm run db:apply-sql /path/to.sql`） |
+| `pnpm run seed` | 写入初始数据（依赖 `.env` 中 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`） |
+
+---
+
+## 快速开始（本地）
 
 ```bash
-# 1. 安装依赖
 pnpm install
-
-# 2. 复制环境变量并填入 Turso 的 DATABASE_URL / DATABASE_AUTH_TOKEN
 cp .env.example .env
-# 按需再复制一份给 Next：cp .env .env.local
+# 将 .env 中的 DATABASE_URL、DATABASE_AUTH_TOKEN 填为 Turso 提供的值
+# 可选：cp .env .env.local 供 Next 加载
 
-# 3. 若为 Turso **空库**：应用仓库内建表 SQL（已建表可跳过；见下文「数据库与 Schema」）
+# 空库：建表
 pnpm run db:apply-sql
 
-# 4. 写入种子数据（需已配置 .env 中的 DATABASE_URL / DATABASE_AUTH_TOKEN）
+# 空库：种子数据（含默认管理员，见下表）
 pnpm run seed
 
-# 5. 启动开发服务器
 pnpm dev
 ```
 
-复制环境变量后，请按需编辑 `.env.local`：**数据库**已统一为 **LibSQL（`libsql://`）**，须配置 `DATABASE_URL` 与（Turso 等远程场景下的）`DATABASE_AUTH_TOKEN`；**登录 / OAuth** 建议填写 `NEXTAUTH_URL`、`NEXTAUTH_SECRET`。
+打开 [http://localhost:3000](http://localhost:3000)。**登录 / OAuth** 建议在 `.env` 或 `.env.local` 中配置 `NEXTAUTH_URL`（如 `http://localhost:3000`）与 `NEXTAUTH_SECRET`（生产务必使用强随机值；未配置时开发环境有代码内回退，**勿用于公网**）。
 
-打开 [http://localhost:3000](http://localhost:3000) 会进入登录页。默认管理员账号：
-
-| 邮箱 | 密码 |
-|---|---|
+| 默认管理员邮箱 | 默认密码 |
+|----------------|----------|
 | admin@example.com | admin123 |
 
-### OAuth2（系统配置）
+部署到公网后请**立即修改密码**或删除该账号。
 
-此前「OAuth2 登录配置」仅写入数据库，未接入认证流程。现在登录接口使用 **NextAuth**，并在每次请求时读取已 **启用** 且 **Client ID/Secret 非占位符** 的提供商记录：
+### OAuth2（与「系统配置」联动）
 
-- **类型为 `github` / `google`**：登录页会出现对应按钮；请在第三方开发者控制台将回调 URL 配置为 `{NEXTAUTH_URL}/api/auth/callback/github` 或 `.../callback/google`。
-- **微信、钉钉、飞书、`custom` 等**：尚未在 NextAuth 中接入，保存后不会影响登录页（需后续单独开发 Provider）。
+NextAuth 在构建登录选项时会读取库中 **已启用** 且 **Client ID / Secret 非占位** 的 `OAuthProvider` 行：
 
-本地建议在 `.env.local` 中显式设置 `NEXTAUTH_URL`（如 `http://localhost:3000`）与 `NEXTAUTH_SECRET`（生产务必使用强随机值）。未设置密钥时本地会使用代码内置开发回退值，**禁止用于公网**。
+- **`type` 为 `github` / `google`**：登录页展示对应按钮；在 GitHub / Google 控制台配置回调：`{NEXTAUTH_URL}/api/auth/callback/github` 或 `.../callback/google`。
+- 其他类型（如微信）尚未接 Provider，仅保存在库中，不影响当前登录页。
 
-## 部署到 Vercel
+---
 
-SQLite 文件在 Vercel Serverless 环境中**无法持久化**，需要使用 [Turso](https://turso.tech) 作为生产数据库。
+## 部署到 Vercel（推荐流程）
 
-### 第一步：创建 Turso 数据库
+Vercel Serverless **无法持久化本地 SQLite 文件**，生产环境请使用 **Turso（LibSQL）**。
+
+### 1. 准备 Turso 数据库
 
 ```bash
-# 安装 Turso CLI
+# 安装 CLI（见 Turso 文档）
 curl -sSfL https://get.tur.so/install.sh | bash
-
-# 登录
 turso auth login
-
-# 创建数据库
 turso db create rbac-template
 
-# 获取数据库 URL
-turso db show rbac-template --url
-# 输出类似：libsql://rbac-template-<username>.turso.io
-
-# 生成访问令牌
-turso db tokens create rbac-template
-# 输出一个长字符串令牌
+turso db show rbac-template --url    # 得到 libsql://...
+turso db tokens create rbac-template  # 得到长令牌
 ```
 
-### 第二步：在 Turso 上应用 Schema
+### 2. 在本地对「线上空库」执行建表 + 种子（一次性）
 
-空库在项目根执行（使用 `.env` 或当前 shell 中的 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`）：
+在项目根配置与线上一致的 `DATABASE_URL`、`DATABASE_AUTH_TOKEN`（可临时写在 `.env` 或 shell `export`），然后：
 
 ```bash
-export DATABASE_URL="libsql://rbac-template-<username>.turso.io"
-export DATABASE_AUTH_TOKEN="<your-token>"
+pnpm install
 pnpm run db:apply-sql
+pnpm run seed
 ```
 
-### 第三步：在 Vercel 配置环境变量
+> **已有数据的库**不要再次执行全量 `sql/schema.sql`；需自行编写增量 SQL。
 
-在 Vercel 项目的 **Settings → Environment Variables** 中添加以下变量（生产环境建议对 **Production** 环境单独勾选）：
+### 3. 将代码推到 GitHub
 
-| 变量名 | 必填 | 说明 |
-|---|---|---|
-| `DATABASE_URL` | 是 | Turso 数据库地址，如 `libsql://rbac-template-<username>.turso.io` |
-| `DATABASE_AUTH_TOKEN` | 是 | Turso 访问令牌（`turso db tokens create`） |
-| `NEXTAUTH_URL` | 强烈建议 | 站点根 URL，如 `https://<your-project>.vercel.app` 或自定义域名，**须含 `https://`**，无末尾斜杠 |
-| `NEXTAUTH_SECRET` | 是 | 随机密钥，用于会话签名；可用 `openssl rand -base64 32` 生成。也可用 `AUTH_SECRET`（二选一，同时存在时优先 `NEXTAUTH_SECRET`） |
+在 [Vercel Dashboard](https://vercel.com/dashboard) → **Add New…** → **Project** → **Import** 该仓库。检测到 `pnpm-lock.yaml` 时会使用 **pnpm**；**Build Command** 保持默认即可（`pnpm run build`）。
 
-未设置 `NEXTAUTH_URL` 时，部分 OAuth 提供商在 Vercel 上可能因回调地址不一致而失败；部署自定义域名后请同步修改该变量。
+### 4. 在 Vercel 配置环境变量
 
-**Vercel 构建说明**：`pnpm run build` 不再依赖 Prisma；`DATABASE_URL` / `DATABASE_AUTH_TOKEN` 须在 Vercel 环境变量中配置（含 **Build** 环境），供服务端渲染与 API 连接 Turso。首页为动态渲染（`force-dynamic`），空库不会在构建阶段因查表失败而中断。
+路径：**Project → Settings → Environment Variables**。
 
-### 第四步：部署
+| 变量名 | 建议勾选环境 | 说明 |
+|--------|----------------|------|
+| `DATABASE_URL` | Production、Preview、**Development**；**Build** 建议一并勾选 | `libsql://...` |
+| `DATABASE_AUTH_TOKEN` | 同上 | Turso token |
+| `NEXTAUTH_SECRET` | Production、Preview（Build 可不填） | `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Production、Preview | 如 `https://你的项目.vercel.app`，**含 `https://`，无末尾 `/`**；换自定义域名后需同步修改 |
 
-```bash
-vercel deploy
-```
+OAuth 回调在第三方控制台填写：`{NEXTAUTH_URL}/api/auth/callback/github` 等。
 
-或将代码推送到 GitHub 后，在 Vercel 控制台导入仓库，Vercel 会自动完成构建和部署。
+### 5. 构建与运行说明
+
+- 构建命令为 **`next build`**，不依赖 Prisma。
+- 首页等为 **动态渲染**（`force-dynamic`），**空库不会在构建阶段因查表失败而中断**；但 API 与登录仍依赖数据库，**首次上线前务必完成步骤 2**。
+- 将 `DATABASE_*` 勾到 **Build**，可避免将来若某构建步骤访问 DB 时出现缺变量问题。
+
+### 6. 触发部署
+
+连接 GitHub 后，每次推送到默认分支会自动部署；也可本地安装 [Vercel CLI](https://vercel.com/docs/cli) 执行 `vercel` / `vercel --prod`。
+
+---
 
 ## 数据库与 Schema（LibSQL）
 
-模板已**统一为 LibSQL 连接串**（推荐 [Turso](https://turso.tech)）：`DATABASE_URL` 须为 **`libsql://...`**，不再使用本地 `file:./dev.db` 作为默认库。建表 DDL 位于仓库根目录 **`sql/schema.sql`**。
+- 连接串：**`DATABASE_URL` 必须为 `libsql://...`**（推荐 Turso），不使用 `file:` 本地库作为默认方案。
+- 建表 DDL 固定在仓库 **`sql/schema.sql`**。
 
-**空库**应用到 Turso：
+应用到远程库（不依赖 Turso CLI 能访问 `api.turso.tech`）：
 
 ```bash
-# 方式 A：脚本直连 libsql://（本机无法访问 api.turso.tech 时推荐）
 pnpm run db:apply-sql
-
-# 方式 B：Turso CLI（需能解析 api.turso.tech）
-turso db shell <你的数据库名> < sql/schema.sql
+# 或：pnpm run db:apply-sql /绝对或相对路径/其它.sql
 ```
 
-若 `turso db shell` 报错 `lookup api.turso.tech: no such host`，属于 **DNS/网络** 无法访问 Turso 控制面；可换 DNS/VPN 排查，或直接使用 **`pnpm run db:apply-sql`**。
+若本机可访问 Turso API，也可用：
 
-**已有数据**的库请自行编写增量 SQL（勿对非空库盲目执行仓库内全量 `CREATE TABLE`）。
+```bash
+turso db shell <数据库名> < sql/schema.sql
+```
 
-## 环境变量说明
+若出现 `lookup api.turso.tech: no such host`，多为 DNS/网络问题，可改用上面的 **`pnpm run db:apply-sql`** 直连 `libsql://`。
 
-NextAuth 使用 `NEXTAUTH_*`（或 `AUTH_SECRET`）。字段级说明如下；**完整注释版模板**见 [`.env.example`](.env.example)。
+---
 
-| 变量名 | 谁读取 | 必填 | 默认 / 回退 | 说明 |
-|---|---|---|---|---|
-| `DATABASE_URL` | Next.js、`db:apply-sql`、`seed` | **是** | — | **必须为 `libsql://...`**（Turso 等）。 |
-| `DATABASE_AUTH_TOKEN` | Next.js、`db:apply-sql`、`seed` | Turso 等远程时 **是** | — | LibSQL 远程访问令牌。 |
-| `NEXTAUTH_URL` | NextAuth、中间件 | 本地可选；**生产 / OAuth 强烈建议** | — | 对外的站点根 URL（含协议，**无末尾斜杠**），如 `http://localhost:3000` 或 `https://your-domain.com`。影响 OAuth 回调校验与重定向；Vercel 上未设易导致第三方登录失败。 |
-| `NEXTAUTH_SECRET` | NextAuth、中间件 | **生产必填**；本地可省略 | 开发用固定回退字符串 | 会话与 JWT 签名密钥。可用 `openssl rand -base64 32` 生成。 |
-| `AUTH_SECRET` | NextAuth、中间件 | 否 | 同左，与 `NEXTAUTH_SECRET` 二选一 | 与 `NEXTAUTH_SECRET` 等价；**同时存在时优先使用 `NEXTAUTH_SECRET`**。 |
+## 环境变量一览
 
-**OAuth 回调地址**（在 GitHub / Google 开发者控制台配置）：
+完整注释模板见 [`.env.example`](.env.example)。
 
-- `{NEXTAUTH_URL}/api/auth/callback/github`
-- `{NEXTAUTH_URL}/api/auth/callback/google`
+| 变量名 | 谁使用 | 必填场景 | 说明 |
+|--------|--------|----------|------|
+| `DATABASE_URL` | Next、`db:apply-sql`、`seed` | 开发与生产 | **`libsql://...`** |
+| `DATABASE_AUTH_TOKEN` | 同上 | Turso 等远程库 | 访问令牌 |
+| `NEXTAUTH_URL` | NextAuth | 生产与 OAuth **强烈建议** | 站点根 URL，无末尾 `/` |
+| `NEXTAUTH_SECRET` | NextAuth | **生产必填** | 会话/JWT 签名；可用 `openssl rand -base64 32` |
+| `AUTH_SECRET` | NextAuth | 可选 | 与 `NEXTAUTH_SECRET` 二选一；同时存在时 **优先 `NEXTAUTH_SECRET`** |
 
-将 `{NEXTAUTH_URL}` 替换为你在上表中配置的实际根地址（勿带末尾 `/`）。
+---
 
+## 仓库结构（与数据相关）
+
+```
+sql/schema.sql              # 建表 + 索引 DDL
+scripts/apply-schema-sql.mjs   # 将 SQL 文件批量执行到 DATABASE_URL
+scripts/seed.mjs            # 种子数据（Node，读 dotenv）
+src/lib/db.ts               # LibSQL 客户端单例、工具函数
+src/lib/data-access.ts      # 业务 SQL / 聚合查询
+src/lib/next-auth-libsql-adapter.ts  # NextAuth Database Adapter（LibSQL）
+```
+
+---
+
+## 许可与贡献
+
+本仓库为模板项目，可按需 fork 后修改业务与权限模型。若二次分发，请保留适当的版权声明（视你追加的许可证而定）。
