@@ -108,7 +108,8 @@ export default async function OAuth2DocsPage() {
           <H2 id="register">2. 在本系统注册客户端</H2>
           <p>
             使用具备后台权限的账号登录后，进入侧边栏 <strong className="text-foreground">「OAuth2 客户端」</strong>
-            （<Code>/oauth2-clients</Code>）创建或编辑客户端，并保存界面一次性展示的 <Code>client_secret</Code>（机密客户端）。
+            ：在 <Code>/oauth2-clients</Code> 查看列表，<Code>/oauth2-clients/new</Code> 新建，路径形如{' '}
+            <Code>/oauth2-clients/&lt;客户端内部 id&gt;/edit</Code> 进入编辑页。机密客户端创建或轮换密钥后，请保存页面展示的 <Code>client_secret</Code>（仅一次明文）。
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>

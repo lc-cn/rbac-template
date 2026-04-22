@@ -168,6 +168,7 @@ export const en: Messages = {
     create: 'New client',
     createTitle: 'New OAuth2 client',
     editTitle: 'Edit OAuth2 client',
+    backToList: 'Back to list',
     colName: 'Name',
     colClientId: 'Client ID',
     colType: 'Type',

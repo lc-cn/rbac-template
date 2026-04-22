@@ -165,6 +165,7 @@ export const zh = {
     create: '新建客户端',
     createTitle: '新建 OAuth2 客户端',
     editTitle: '编辑 OAuth2 客户端',
+    backToList: '返回列表',
     colName: '应用名称',
     colClientId: 'Client ID',
     colType: '类型',
