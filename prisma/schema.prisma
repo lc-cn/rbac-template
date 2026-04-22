@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  // 与 @prisma/client/default.d.ts 中的 `.prisma/client` 相对路径一致，避免 pnpm 下生成到包外导致 TS 报「无 PrismaClient」
+  // 与 @prisma/client/default.d.ts 的 `.prisma/client` 相对路径一致；运行时依赖留在 node_modules 供打包器解析
   output   = "../node_modules/@prisma/client/.prisma/client"
 }
 

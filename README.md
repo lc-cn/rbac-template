@@ -106,7 +106,7 @@ pnpm run db:apply-sql /tmp/schema.sql
 
 未设置 `NEXTAUTH_URL` 时，部分 OAuth 提供商在 Vercel 上可能因回调地址不一致而失败；部署自定义域名后请同步修改该变量。
 
-**Vercel 构建说明**：`pnpm run build` 会先执行 `prisma generate` 再 `next build`；`tsconfig.json` 已排除 `prisma/` 目录，避免把 `seed.ts` 当作 Next 应用一起类型检查（否则易出现「`@prisma/client` 无 PrismaClient」的误报）。`DATABASE_URL` / `DATABASE_AUTH_TOKEN` 仍须在 Vercel 环境变量中配置，供预渲染与运行时连接 Turso。
+**Vercel 构建说明**：`pnpm run build` 会先执行 `prisma generate` 再 `next build`；`postinstall` 也会执行 `prisma generate`。若在 Vercel + pnpm 上出现「`@prisma/client` 无 PrismaClient」类型错误，仓库已在 `tsconfig.json` 的 `paths` 中将 `@prisma/client` 指向生成后的 `node_modules/@prisma/client/.prisma/client/index`，与 `schema.prisma` 里的 `output` 一致。`tsconfig.json` 排除 `prisma/`，不把 `seed.ts` 纳入 Next 的类型检查。`DATABASE_URL` / `DATABASE_AUTH_TOKEN` 仍须在 Vercel 环境变量中配置，供预渲染与运行时连接 Turso（空库会导致预渲染失败，需先按上文应用 schema）。
 
 ### 第四步：部署
 
