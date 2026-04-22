@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { getProviders, signIn } from 'next-auth/react'
-import { BookOpen, ChevronRight } from 'lucide-react'
+import { BookOpen, ChevronRight, LayoutDashboard } from 'lucide-react'
 import { useI18n } from '@/i18n/context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -76,13 +76,18 @@ export function LoginForm() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[100dvh] max-w-md flex-col justify-center px-4 py-12">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t('login.title')}</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{t('login.subtitle')}</p>
-      </div>
+    <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-4 py-12 sm:py-16">
+      <header className="mb-8 text-center sm:mb-10">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/85 text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-white/10 dark:ring-white/5">
+          <LayoutDashboard className="h-8 w-8" aria-hidden />
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{t('nav.brand')}</h1>
+        <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{t('nav.tagline')}</p>
+        <p className="mt-8 text-sm text-muted-foreground">{t('login.subtitle')}</p>
+      </header>
 
-      <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-card ring-1 ring-black/[0.03] dark:ring-white/[0.06]">
+      <div className="rounded-2xl border border-border/60 bg-card/95 p-6 shadow-xl shadow-black/[0.04] ring-1 ring-black/[0.04] backdrop-blur-sm dark:bg-card/90 dark:ring-white/[0.06] sm:p-7">
+        <h2 className="mb-5 text-center text-base font-semibold tracking-tight text-foreground">{t('login.title')}</h2>
         {providers === null ? (
           <p className="text-center text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : (
