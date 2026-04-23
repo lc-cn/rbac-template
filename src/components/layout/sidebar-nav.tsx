@@ -14,7 +14,6 @@ import {
   Layers,
   Settings,
   LayoutDashboard,
-  Plug,
   CircleUser,
 } from 'lucide-react'
 
@@ -26,7 +25,6 @@ const navItems = [
   { href: '/permissions', labelKey: 'nav.permissions', icon: Key },
   { href: '/applications', labelKey: 'nav.applications', icon: AppWindow },
   { href: '/features', labelKey: 'nav.features', icon: Layers },
-  { href: '/oauth2-clients', labelKey: 'nav.oauth2Clients', icon: Plug },
   { href: '/system-config', labelKey: 'nav.systemConfig', icon: Settings },
 ] as const
 

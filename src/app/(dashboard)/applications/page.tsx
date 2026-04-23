@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import { useI18n } from '@/i18n/context'
 import { PageShell, PageHeader, CardToolbar } from '@/components/layout/page-shell'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Plug } from 'lucide-react'
 
 interface Application {
   id: string
@@ -27,6 +28,7 @@ interface Application {
   description?: string
   status: boolean
   createdAt: string
+  oauthClientId: string | null
   features: { id: string; name: string }[]
 }
 
@@ -135,6 +137,7 @@ export default function ApplicationsPage() {
                 <th className="app-table-head">{t('applications.colCode')}</th>
                 <th className="app-table-head">{t('applications.colDesc')}</th>
                 <th className="app-table-head">{t('applications.colFeatures')}</th>
+                <th className="app-table-head">{t('applications.colOidc')}</th>
                 <th className="app-table-head">{t('applications.colStatus')}</th>
                 <th className="app-table-head">{t('common.createdAt')}</th>
                 <th className="app-table-head app-table-head-end">{t('common.operation')}</th>
@@ -142,15 +145,23 @@ export default function ApplicationsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td></tr>
               ) : apps.length === 0 ? (
-                <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">{t('common.empty')}</td></tr>
+                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">{t('common.empty')}</td></tr>
               ) : apps.map(app => (
                 <tr key={app.id} className="border-b border-border hover:bg-muted/50">
                   <td className="app-table-cell font-medium">{app.name}</td>
                   <td className="app-table-cell font-mono text-xs text-muted-foreground">{app.code}</td>
                   <td className="app-table-cell text-muted-foreground">{app.description || '-'}</td>
                   <td className="app-table-cell"><Badge variant="outline">{app.features.length}</Badge></td>
+                  <td className="app-table-cell">
+                    <Button variant="outline" size="sm" className="h-8 gap-1.5 px-2 text-xs" asChild>
+                      <Link href={`/applications/${app.id}/idp`}>
+                        <Plug className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                        {app.oauthClientId ? t('applications.idpManage') : t('applications.idpConfigure')}
+                      </Link>
+                    </Button>
+                  </td>
                   <td className="app-table-cell">
                     <Badge variant={app.status ? 'default' : 'secondary'}>
                       {app.status ? t('common.enabled') : t('common.disabled')}

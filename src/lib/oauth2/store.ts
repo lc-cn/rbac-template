@@ -4,6 +4,7 @@ import { getDb, newId, nowIso } from '@/lib/db'
 
 export type OAuth2ClientRow = {
   id: string
+  applicationId: string
   clientId: string
   clientSecretHash: string | null
   name: string
@@ -30,12 +31,22 @@ function numCol(v: unknown, fallback: number): number {
   return Number.isFinite(n) ? n : fallback
 }
 
+/** 映射 OAuth2Client 行；同意页/运行时展示名来自 JOIN 的 applicationName（或兼容旧列 name） */
 export function mapOAuth2ClientRow(row: Record<string, unknown>): OAuth2ClientRow {
+  const applicationId =
+    row.applicationId != null && String(row.applicationId).trim() !== ''
+      ? String(row.applicationId).trim()
+      : String(row.id).trim()
+  const nameFromJoin =
+    row.applicationName != null && String(row.applicationName).trim() !== ''
+      ? String(row.applicationName).trim()
+      : String(row.name ?? '').trim()
   return {
     id: String(row.id),
+    applicationId,
     clientId: String(row.clientId),
     clientSecretHash: row.clientSecretHash == null ? null : String(row.clientSecretHash),
-    name: String(row.name),
+    name: nameFromJoin || '(应用)',
     redirectUrisJson: String(row.redirectUrisJson),
     allowedScopes: String(row.allowedScopes),
     logoUrl: row.logoUrl == null || String(row.logoUrl).trim() === '' ? null : String(row.logoUrl).trim(),
@@ -98,7 +109,13 @@ export function redirectUriAllowed(redirectUri: string, uris: string[]): boolean
 
 export async function getOAuth2ClientByClientId(clientId: string): Promise<OAuth2ClientRow | null> {
   const db = getDb()
-  const r = await db.execute({ sql: `SELECT * FROM "OAuth2Client" WHERE "clientId" = ?`, args: [clientId] })
+  const r = await db.execute({
+    sql: `SELECT o.*, a."name" AS "applicationName"
+          FROM "OAuth2Client" o
+          INNER JOIN "Application" a ON a."id" = o."applicationId"
+          WHERE o."clientId" = ?`,
+    args: [clientId],
+  })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
   return mapOAuth2ClientRow(row)

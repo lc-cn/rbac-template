@@ -8,6 +8,7 @@ type SqlArg = string | number | bigint | boolean | null
 type SqlArgs = SqlArg[]
 
 function mapApp(row: Record<string, unknown>) {
+  const oid = row.oauthClientId == null ? '' : String(row.oauthClientId).trim()
   return {
     id: String(row.id),
     name: String(row.name),
@@ -16,6 +17,7 @@ function mapApp(row: Record<string, unknown>) {
     status: boolFromSql(row.status),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
+    oauthClientId: oid.length ? oid : null,
   }
 }
 
@@ -97,14 +99,14 @@ async function loadFeaturesWithPermissionsForAppIds(applicationIds: string[]) {
 
 export async function listApplications(search: string) {
   const db = getDb()
-  let sql = `SELECT * FROM "Application"`
+  let sql = `SELECT a.*, o."clientId" AS "oauthClientId" FROM "Application" a LEFT JOIN "OAuth2Client" o ON o."applicationId" = a."id"`
   const args: SqlArgs = []
   if (search) {
-    sql += ` WHERE "name" LIKE ? OR "code" LIKE ?`
+    sql += ` WHERE a."name" LIKE ? OR a."code" LIKE ?`
     const p = `%${search.replace(/%/g, '')}%`
     args.push(p, p)
   }
-  sql += ` ORDER BY "createdAt" DESC`
+  sql += ` ORDER BY a."createdAt" DESC`
   const r = await db.execute({ sql, args })
   const apps = (r.rows as unknown as Record<string, unknown>[]).map(mapApp)
   const ids = apps.map((a) => a.id)
@@ -121,7 +123,10 @@ export async function listApplications(search: string) {
 
 export async function getApplicationById(id: string) {
   const db = getDb()
-  const r = await db.execute({ sql: `SELECT * FROM "Application" WHERE "id" = ?`, args: [id] })
+  const r = await db.execute({
+    sql: `SELECT a.*, o."clientId" AS "oauthClientId" FROM "Application" a LEFT JOIN "OAuth2Client" o ON o."applicationId" = a."id" WHERE a."id" = ?`,
+    args: [id],
+  })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
   const app = mapApp(row)

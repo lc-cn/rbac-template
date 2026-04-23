@@ -38,7 +38,6 @@ export const zh = {
     permissions: '权限管理',
     applications: '应用管理',
     features: '功能管理',
-    oauth2Clients: 'OAuth2 客户端',
     systemConfig: '系统配置',
     brand: 'RBAC 管理系统',
     tagline: '权限管理平台',
@@ -138,6 +137,14 @@ export const zh = {
     created: '应用已创建',
     deleted: '应用已删除',
     deleteFail: '删除失败',
+    colOidc: '对外认证',
+    idpConfigure: '配置 OIDC',
+    idpManage: '管理 OIDC',
+    idpBackToList: '返回应用列表',
+    idpCreateTitle: '启用 OAuth2 / OIDC 客户端',
+    idpEditTitle: 'OAuth2 / OIDC 客户端',
+    idpSubtitle:
+      '与当前应用绑定：第三方站点使用授权码对接本系统 IdP；同意页展示名称、Logo 与回调等以本节配置为准。',
   },
   features: {
     title: '功能管理',

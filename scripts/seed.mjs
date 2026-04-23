@@ -195,13 +195,14 @@ async function main() {
   console.log('管理员账号: admin@example.com / admin123')
 }
 
-/** 机密型 OAuth2 客户端示例（第三方站点对接用，生产务必改密与 redirect） */
+/** 示例应用 + OIDC 客户端（OAuth2Client.applicationId 关联 Application；生产务必改密与 redirect） */
 async function seedOAuth2DemoClient() {
   const clientId = 'rbac_demo_client'
   const existing = await db.execute({ sql: `SELECT "id" FROM "OAuth2Client" WHERE "clientId" = ?`, args: [clientId] })
   if (existing.rows[0]) return
 
-  const id = randomUUID()
+  const appId = randomUUID()
+  const oauthId = randomUUID()
   const t = now()
   const secretHash = bcrypt.hashSync('demo_secret_please_change', 10)
   const redirectUrisJson = JSON.stringify([
@@ -209,21 +210,34 @@ async function seedOAuth2DemoClient() {
     'http://127.0.0.1:5173/oauth/callback',
   ])
   await db.execute({
-    sql: `INSERT INTO "OAuth2Client" ("id","clientId","clientSecretHash","name","redirectUrisJson","allowedScopes","createdAt","updatedAt")
-          VALUES (?,?,?,?,?,?,?,?)`,
+    sql: `INSERT INTO "Application" ("id","name","code","description","status","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
+    args: [appId, '示例第三方应用', clientId, null, 1, t, t],
+  })
+  await db.execute({
+    sql: `INSERT INTO "OAuth2Client" (
+      "id","applicationId","clientId","clientSecretHash","redirectUrisJson","allowedScopes",
+      "postLogoutRedirectUrisJson","allowedGrantTypes",
+      "accessTokenTtlSeconds","refreshTokenTtlDays","authorizationCodeTtlMinutes",
+      "createdAt","updatedAt"
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     args: [
-      id,
+      oauthId,
+      appId,
       clientId,
       secretHash,
-      '示例第三方应用',
       redirectUrisJson,
       'openid profile email offline_access',
+      '[]',
+      'authorization_code,refresh_token',
+      3600,
+      30,
+      10,
       t,
       t,
     ],
   })
   console.log(
-    '已注册 OAuth2 示例客户端 client_id=rbac_demo_client，client_secret=demo_secret_please_change，回调见 redirectUrisJson'
+    '已注册示例应用（含 OIDC）client_id=rbac_demo_client，client_secret=demo_secret_please_change，回调见 OAuth2Client.redirectUrisJson'
   )
 }
 

@@ -110,11 +110,13 @@ export default async function OAuth2DocsPage() {
         </section>
 
         <section className="space-y-3">
-          <H2 id="register">2. 在管理控制台注册 OAuth2 客户端</H2>
+          <H2 id="register">2. 在管理控制台登记「应用」与 OIDC 客户端</H2>
           <p>
             请由具备相应<strong className="text-foreground">后台管理权限</strong>的账号登录控制台，在侧栏进入{' '}
-            <strong className="text-foreground">「OAuth2 客户端」</strong>模块：于 <Code>/oauth2-clients</Code> 维护客户端清单，在{' '}
-            <Code>/oauth2-clients/new</Code> 创建新客户端，或通过 <Code>/oauth2-clients/&lt;内部标识&gt;/edit</Code> 进入编辑页完成参数治理。
+            <strong className="text-foreground">「应用管理」</strong>（<Code>/applications</Code>）：先创建或选择业务应用，再在列表中进入{' '}
+            <strong className="text-foreground">「配置 OIDC / 管理 OIDC」</strong>（路径形如 <Code>/applications/&lt;应用 id&gt;/idp</Code>
+            ）维护对外授权客户端。IdP 客户端与 RBAC 应用在数据上<strong className="text-foreground">合一</strong>
+            ：同意页展示名称、Logo 等与该应用记录一致。
             对于<strong className="text-foreground">机密（Confidential）客户端</strong>，在创建或轮换密钥后，请务必在安全渠道留存页面一次性展示的{' '}
             <Code>client_secret</Code>；系统不会再次提供明文。
           </p>

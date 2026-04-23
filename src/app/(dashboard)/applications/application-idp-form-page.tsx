@@ -19,7 +19,7 @@ import {
   scopesFromForm,
   type OAuth2ClientDto,
   type OAuth2ClientFormState,
-} from './types'
+} from './oauth-idp-types'
 
 const SECRET_FLASH_KEY = 'oauth2_client_secret_flash'
 
@@ -36,10 +36,12 @@ function FieldHint({ text }: { text: string }) {
   return <p className="text-xs leading-relaxed text-muted-foreground">{text}</p>
 }
 
-export function OAuth2ClientFormPage({
+export function ApplicationIdpFormPage({
+  applicationId,
   mode,
   initialRow,
 }: {
+  applicationId: string
   mode: 'create' | 'edit'
   initialRow?: OAuth2ClientDto | null
 }) {
@@ -112,7 +114,7 @@ export function OAuth2ClientFormPage({
     try {
       const base = buildPayload()
       if (mode === 'edit' && initialRow) {
-        const res = await fetch(`/api/oauth2-clients/${initialRow.id}`, {
+        const res = await fetch(`/api/applications/${applicationId}/oauth`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -127,10 +129,10 @@ export function OAuth2ClientFormPage({
           setFlashSecret(String(data.clientSecret))
           setForm((p) => ({ ...p, clientSecret: '', regenerateSecret: false }))
         } else {
-          router.push('/oauth2-clients')
+          router.push('/applications')
         }
       } else {
-        const res = await fetch('/api/oauth2-clients', {
+        const res = await fetch(`/api/applications/${applicationId}/oauth`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(base),
@@ -139,12 +141,11 @@ export function OAuth2ClientFormPage({
         if (!res.ok) throw new Error(data.error || 'fail')
         toast({ title: t('common.success'), description: t('oauth2Clients.created') })
         const secret = data.clientSecret ? String(data.clientSecret) : null
-        const newId = data.id as string | undefined
-        if (secret && newId) {
-          sessionStorage.setItem(SECRET_FLASH_KEY, JSON.stringify({ id: newId, secret }))
-          router.replace(`/oauth2-clients/${newId}/edit`)
+        if (secret) {
+          sessionStorage.setItem(SECRET_FLASH_KEY, JSON.stringify({ id: applicationId, secret }))
+          router.replace(`/applications/${applicationId}/idp`)
         } else {
-          router.push('/oauth2-clients')
+          router.push('/applications')
         }
       }
     } catch (error: unknown) {
@@ -160,13 +161,17 @@ export function OAuth2ClientFormPage({
   return (
     <PageShell>
       <PageHeader
-        title={mode === 'create' ? t('oauth2Clients.createTitle') : t('oauth2Clients.editTitle')}
-        description={mode === 'edit' && initialRow ? `${initialRow.clientId} · ${initialRow.name}` : t('oauth2Clients.subtitle')}
+        title={mode === 'create' ? t('applications.idpCreateTitle') : t('applications.idpEditTitle')}
+        description={
+          mode === 'edit' && initialRow
+            ? `${initialRow.clientId} · ${initialRow.name}`
+            : t('applications.idpSubtitle')
+        }
         actions={
           <Button asChild variant="outline" className="w-full shrink-0 sm:w-auto">
-            <Link href="/oauth2-clients">
+            <Link href="/applications">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              {t('oauth2Clients.backToList')}
+              {t('applications.idpBackToList')}
             </Link>
           </Button>
         }
@@ -455,7 +460,7 @@ export function OAuth2ClientFormPage({
           </Section>
         </CardContent>
         <CardFooter className="flex flex-wrap justify-end gap-2 border-t border-border/60 bg-muted/20 px-6 py-4">
-          <Button type="button" variant="outline" disabled={busy} onClick={() => router.push('/oauth2-clients')}>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => router.push('/applications')}>
             {t('common.cancel')}
           </Button>
           <Button type="button" onClick={() => void handleSubmit()} disabled={busy || showSecretBanner}>

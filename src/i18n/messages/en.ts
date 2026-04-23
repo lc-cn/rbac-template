@@ -40,7 +40,6 @@ export const en: Messages = {
     permissions: 'Permissions',
     applications: 'Applications',
     features: 'Features',
-    oauth2Clients: 'OAuth2 clients',
     systemConfig: 'Settings',
     brand: 'RBAC Admin',
     tagline: 'Role-based access control',
@@ -140,6 +139,14 @@ export const en: Messages = {
     created: 'Application created',
     deleted: 'Application deleted',
     deleteFail: 'Delete failed',
+    colOidc: 'OIDC / OAuth2',
+    idpConfigure: 'Set up OIDC',
+    idpManage: 'Manage OIDC',
+    idpBackToList: 'Back to applications',
+    idpCreateTitle: 'Enable OAuth2 / OIDC client',
+    idpEditTitle: 'OAuth2 / OIDC client',
+    idpSubtitle:
+      'Bound to this application: third-party apps use the authorization code flow against this IdP; consent screens use the name, logo, and redirect settings from here.',
   },
   features: {
     title: 'Features',

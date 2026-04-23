@@ -1,4 +1,4 @@
--- LibSQL / Turso 建表 DDL（与原先 Prisma schema 一致）。应用 `pnpm run db:apply-sql sql/schema.sql`
+-- LibSQL / Turso：空库一键建表（聚合 DDL）。表结构演进请先写 sql/migrations/NNN_*.sql，再把本文件维护到与迁移终点一致。应用：pnpm run db:apply-sql sql/schema.sql
 
 CREATE TABLE "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
@@ -70,6 +70,29 @@ CREATE TABLE "Application" (
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- IdP OAuth2/OIDC 客户端：一条应用最多一条（applicationId UNIQUE），展示名用 Application.name
+CREATE TABLE "OAuth2Client" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "applicationId" TEXT NOT NULL,
+    "clientId" TEXT NOT NULL,
+    "clientSecretHash" TEXT,
+    "redirectUrisJson" TEXT NOT NULL,
+    "allowedScopes" TEXT NOT NULL DEFAULT 'openid profile email offline_access',
+    "logoUrl" TEXT,
+    "clientUri" TEXT,
+    "policyUri" TEXT,
+    "tosUri" TEXT,
+    "postLogoutRedirectUrisJson" TEXT NOT NULL DEFAULT '[]',
+    "jwksUri" TEXT,
+    "allowedGrantTypes" TEXT NOT NULL DEFAULT 'authorization_code,refresh_token',
+    "accessTokenTtlSeconds" INTEGER NOT NULL DEFAULT 3600,
+    "refreshTokenTtlDays" INTEGER NOT NULL DEFAULT 30,
+    "authorizationCodeTtlMinutes" INTEGER NOT NULL DEFAULT 10,
+    "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
+    "updatedAt" TEXT NOT NULL DEFAULT (datetime('now')),
+    CONSTRAINT "OAuth2Client_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE "Feature" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
@@ -130,32 +153,12 @@ CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationTok
 CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
 CREATE UNIQUE INDEX "Application_name_key" ON "Application"("name");
 CREATE UNIQUE INDEX "Application_code_key" ON "Application"("code");
+CREATE UNIQUE INDEX "OAuth2Client_applicationId_key" ON "OAuth2Client"("applicationId");
+CREATE UNIQUE INDEX "OAuth2Client_clientId_key" ON "OAuth2Client"("clientId");
 CREATE UNIQUE INDEX "Feature_applicationId_code_key" ON "Feature"("applicationId", "code");
 CREATE UNIQUE INDEX "Permission_code_key" ON "Permission"("code");
 CREATE UNIQUE INDEX "SystemConfig_key_key" ON "SystemConfig"("key");
 CREATE UNIQUE INDEX "OAuthProvider_name_key" ON "OAuthProvider"("name");
-
--- 自建 OAuth2 / OIDC：第三方站点作为 Client，本系统作为授权服务器
-CREATE TABLE "OAuth2Client" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "clientId" TEXT NOT NULL,
-    "clientSecretHash" TEXT,
-    "name" TEXT NOT NULL,
-    "redirectUrisJson" TEXT NOT NULL,
-    "allowedScopes" TEXT NOT NULL DEFAULT 'openid profile email offline_access',
-    "logoUrl" TEXT,
-    "clientUri" TEXT,
-    "policyUri" TEXT,
-    "tosUri" TEXT,
-    "postLogoutRedirectUrisJson" TEXT NOT NULL DEFAULT '[]',
-    "jwksUri" TEXT,
-    "allowedGrantTypes" TEXT NOT NULL DEFAULT 'authorization_code,refresh_token',
-    "accessTokenTtlSeconds" INTEGER NOT NULL DEFAULT 3600,
-    "refreshTokenTtlDays" INTEGER NOT NULL DEFAULT 30,
-    "authorizationCodeTtlMinutes" INTEGER NOT NULL DEFAULT 10,
-    "createdAt" TEXT NOT NULL DEFAULT (datetime('now')),
-    "updatedAt" TEXT NOT NULL DEFAULT (datetime('now'))
-);
 
 CREATE TABLE "OAuth2AuthorizationCode" (
     "id" TEXT NOT NULL PRIMARY KEY,
@@ -172,7 +175,6 @@ CREATE TABLE "OAuth2AuthorizationCode" (
     CONSTRAINT "OAuth2AuthorizationCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE UNIQUE INDEX "OAuth2Client_clientId_key" ON "OAuth2Client"("clientId");
 CREATE UNIQUE INDEX "OAuth2AuthorizationCode_code_key" ON "OAuth2AuthorizationCode"("code");
 CREATE INDEX "OAuth2AuthorizationCode_expiresAt_idx" ON "OAuth2AuthorizationCode"("expiresAt");
 

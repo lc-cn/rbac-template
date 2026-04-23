@@ -38,6 +38,7 @@
 | `pnpm run lint` | ESLint |
 | `pnpm run db:apply-sql` | 将 `sql/schema.sql` 应用到 `DATABASE_URL` 指向的库（默认文件路径；可传参：`pnpm run db:apply-sql /path/to.sql`） |
 | `pnpm run db:apply-sql sql/migrations/002_oauth2_authorization_server.sql` | 旧库仅补 OAuth2 表时使用（新库已含于 `sql/schema.sql`） |
+| `pnpm run db:apply-sql sql/migrations/005_oauth2_client_application_fk.sql` | 仅当库里 `Application` 仍带 `oauthClientId` 等列时执行一次（见 `sql/migrations/README.md`） |
 | `pnpm run seed` | 写入初始数据（依赖 `.env` 中 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`） |
 
 ---
@@ -225,7 +226,7 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 | **机密（confidential）** | 非空（bcrypt 存哈希） | 换 token 时校验 `client_secret`（表单或 HTTP Basic）；授权端可选 PKCE；若授权时带了 `code_challenge`，换 token 必须带正确 `code_verifier` |
 | **公开（public）** | `NULL` | 授权与换 token **必须 PKCE**（`code_challenge` + `code_challenge_method=S256`） |
 
-`redirect_uri` 必须与库中 `redirectUrisJson`（JSON 字符串数组）**完全一致**（含端口、路径、`http`/`https`）。
+`redirect_uri` 必须与库中 `OAuth2Client.redirectUrisJson`（JSON 字符串数组）**完全一致**（含端口、路径、`http`/`https`）。
 
 ### 种子中的示例客户端
 
@@ -233,7 +234,7 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 
 - `client_id`: **`rbac_demo_client`**
 - `client_secret`: **`demo_secret_please_change`**
-- 允许的 `redirect_uri`：`http://localhost:5173/oauth/callback`、`http://127.0.0.1:5173/oauth/callback`（可按需在库里改 `redirectUrisJson`）
+- 允许的 `redirect_uri`：`http://localhost:5173/oauth/callback`、`http://127.0.0.1:5173/oauth/callback`（可按需在库里改 `OAuth2Client.redirectUrisJson`）
 
 生产环境请**删除或改密**，并登记真实业务域名回调。
 

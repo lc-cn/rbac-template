@@ -25,6 +25,25 @@ export type OAuth2ClientAdminDto = {
   updatedAt: string
 }
 
+export type EnableOAuthForApplicationInput = {
+  name: string
+  clientId?: string
+  redirectUris: unknown
+  postLogoutRedirectUris?: unknown
+  allowedScopes: string
+  confidential: boolean
+  plainSecret?: string | null
+  logoUrl?: string | null
+  clientUri?: string | null
+  policyUri?: string | null
+  tosUri?: string | null
+  jwksUri?: string | null
+  grantRefreshToken?: boolean
+  accessTokenTtlSeconds?: number
+  refreshTokenTtlDays?: number
+  authorizationCodeTtlMinutes?: number
+}
+
 function grantsToCsv(grantRefresh: boolean): string {
   return grantRefresh ? 'authorization_code,refresh_token' : 'authorization_code'
 }
@@ -50,7 +69,7 @@ function normCodeMin(v: unknown, fallback: number): number {
 function toDto(row: OAuth2ClientRow): OAuth2ClientAdminDto {
   const g = parseGrantTypesCsv(row.allowedGrantTypes)
   return {
-    id: row.id,
+    id: row.applicationId,
     clientId: row.clientId,
     name: row.name,
     redirectUris: parseRedirectUris(row.redirectUrisJson),
@@ -75,15 +94,28 @@ function toDto(row: OAuth2ClientRow): OAuth2ClientAdminDto {
 export async function listOAuth2ClientsAdmin(): Promise<OAuth2ClientAdminDto[]> {
   const db = getDb()
   const r = await db.execute({
-    sql: `SELECT * FROM "OAuth2Client" ORDER BY "createdAt" DESC`,
+    sql: `SELECT o.*, a."name" AS "applicationName"
+          FROM "OAuth2Client" o
+          INNER JOIN "Application" a ON a."id" = o."applicationId"
+          ORDER BY o."createdAt" DESC`,
     args: [],
   })
-  return r.rows.map((raw) => toDto(mapOAuth2ClientRow(raw as unknown as Record<string, unknown>)))
+  const out: OAuth2ClientAdminDto[] = []
+  for (const raw of r.rows) {
+    out.push(toDto(mapOAuth2ClientRow(raw as unknown as Record<string, unknown>)))
+  }
+  return out
 }
 
-export async function getOAuth2ClientAdminById(id: string): Promise<OAuth2ClientAdminDto | null> {
+export async function getOAuth2ClientAdminById(applicationId: string): Promise<OAuth2ClientAdminDto | null> {
   const db = getDb()
-  const r = await db.execute({ sql: `SELECT * FROM "OAuth2Client" WHERE "id" = ?`, args: [id] })
+  const r = await db.execute({
+    sql: `SELECT o.*, a."name" AS "applicationName"
+          FROM "OAuth2Client" o
+          INNER JOIN "Application" a ON a."id" = o."applicationId"
+          WHERE o."applicationId" = ?`,
+    args: [applicationId],
+  })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
   return toDto(mapOAuth2ClientRow(row))
@@ -100,24 +132,21 @@ function normalizeOptionalUrl(s: unknown): string | null {
   return t.length ? t : null
 }
 
-export async function createOAuth2ClientAdmin(input: {
-  name: string
-  clientId?: string
-  redirectUris: unknown
-  postLogoutRedirectUris?: unknown
-  allowedScopes: string
-  confidential: boolean
-  plainSecret?: string | null
-  logoUrl?: string | null
-  clientUri?: string | null
-  policyUri?: string | null
-  tosUri?: string | null
-  jwksUri?: string | null
-  grantRefreshToken?: boolean
-  accessTokenTtlSeconds?: number
-  refreshTokenTtlDays?: number
-  authorizationCodeTtlMinutes?: number
-}): Promise<{ dto: OAuth2ClientAdminDto; plainSecret: string | null }> {
+/** 在已有应用上首次写入 OAuth/OIDC 客户端配置（该应用尚无 OAuth2Client 行） */
+export async function enableOAuthForApplication(
+  applicationId: string,
+  input: EnableOAuthForApplicationInput
+): Promise<{ dto: OAuth2ClientAdminDto; plainSecret: string | null }> {
+  const db = getDb()
+  const appEx = await db.execute({ sql: `SELECT 1 FROM "Application" WHERE "id" = ?`, args: [applicationId] })
+  if (!appEx.rows[0]) throw new Error('应用不存在')
+
+  const dup = await db.execute({
+    sql: `SELECT 1 FROM "OAuth2Client" WHERE "applicationId" = ?`,
+    args: [applicationId],
+  })
+  if (dup.rows[0]) throw new Error('该应用已配置 OIDC 客户端，请直接编辑')
+
   const name = String(input.name || '').trim()
   if (!name) throw new Error('名称必填')
 
@@ -149,10 +178,9 @@ export async function createOAuth2ClientAdmin(input: {
     clientSecretHash = bcrypt.hashSync(plainSecret, 10)
   }
 
-  const db = getDb()
-  const id = newId()
   const t = nowIso()
   const redirectUrisJson = JSON.stringify(redirectUris)
+  const oauthId = newId()
 
   const logoUrl = normalizeOptionalUrl(input.logoUrl)
   const clientUri = normalizeOptionalUrl(input.clientUri)
@@ -163,16 +191,16 @@ export async function createOAuth2ClientAdmin(input: {
   try {
     await db.execute({
       sql: `INSERT INTO "OAuth2Client" (
-        "id","clientId","clientSecretHash","name","redirectUrisJson","allowedScopes",
+        "id","applicationId","clientId","clientSecretHash","redirectUrisJson","allowedScopes",
         "logoUrl","clientUri","policyUri","tosUri","postLogoutRedirectUrisJson","jwksUri",
         "allowedGrantTypes","accessTokenTtlSeconds","refreshTokenTtlDays","authorizationCodeTtlMinutes",
         "createdAt","updatedAt"
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       args: [
-        id,
+        oauthId,
+        applicationId,
         clientId,
         clientSecretHash,
-        name,
         redirectUrisJson,
         allowedScopes,
         logoUrl,
@@ -189,18 +217,22 @@ export async function createOAuth2ClientAdmin(input: {
         t,
       ],
     })
+    await db.execute({
+      sql: `UPDATE "Application" SET "name" = ?, "updatedAt" = ? WHERE "id" = ?`,
+      args: [name, t, applicationId],
+    })
   } catch (e) {
     if (isUniqueConstraintError(e)) throw new Error('client_id 已存在')
     throw e
   }
 
-  const dto = await getOAuth2ClientAdminById(id)
-  if (!dto) throw new Error('创建后读取失败')
+  const dto = await getOAuth2ClientAdminById(applicationId)
+  if (!dto) throw new Error('保存后读取失败')
   return { dto, plainSecret: input.confidential ? plainSecret : null }
 }
 
 export async function updateOAuth2ClientAdmin(
-  id: string,
+  applicationId: string,
   input: {
     name?: string
     redirectUris?: unknown
@@ -220,7 +252,7 @@ export async function updateOAuth2ClientAdmin(
     authorizationCodeTtlMinutes?: number
   }
 ): Promise<{ dto: OAuth2ClientAdminDto; plainSecret: string | null }> {
-  const existing = await getOAuth2ClientAdminById(id)
+  const existing = await getOAuth2ClientAdminById(applicationId)
   if (!existing) throw new Error('客户端不存在')
 
   const name = input.name != null ? String(input.name).trim() : existing.name
@@ -264,7 +296,10 @@ export async function updateOAuth2ClientAdmin(
   let plainSecret: string | null = null
 
   const db = getDb()
-  const cur = await db.execute({ sql: `SELECT "clientSecretHash" FROM "OAuth2Client" WHERE "id" = ?`, args: [id] })
+  const cur = await db.execute({
+    sql: `SELECT "clientSecretHash" FROM "OAuth2Client" WHERE "applicationId" = ?`,
+    args: [applicationId],
+  })
   const curRow = cur.rows[0] as unknown as Record<string, unknown> | undefined
   const curHash = curRow?.clientSecretHash == null ? null : String(curRow.clientSecretHash)
 
@@ -278,6 +313,8 @@ export async function updateOAuth2ClientAdmin(
       plainSecret = randomBytes(32).toString('base64url')
       clientSecretHash = bcrypt.hashSync(plainSecret, 10)
     }
+  } else {
+    clientSecretHash = null
   }
 
   const logoUrl = input.logoUrl !== undefined ? normalizeOptionalUrl(input.logoUrl) : existing.logoUrl
@@ -290,14 +327,28 @@ export async function updateOAuth2ClientAdmin(
   const redirectUrisJson = JSON.stringify(redirectUris)
 
   await db.execute({
+    sql: `UPDATE "Application" SET "name" = ?, "updatedAt" = ? WHERE "id" = ?`,
+    args: [name, t, applicationId],
+  })
+
+  await db.execute({
     sql: `UPDATE "OAuth2Client" SET
-      "name"=?,"clientSecretHash"=?,"redirectUrisJson"=?,"allowedScopes"=?,
-      "logoUrl"=?,"clientUri"=?,"policyUri"=?,"tosUri"=?,"postLogoutRedirectUrisJson"=?,"jwksUri"=?,
-      "allowedGrantTypes"=?,"accessTokenTtlSeconds"=?,"refreshTokenTtlDays"=?,"authorizationCodeTtlMinutes"=?,
+      "clientSecretHash"=?,
+      "redirectUrisJson"=?,
+      "allowedScopes"=?,
+      "logoUrl"=?,
+      "clientUri"=?,
+      "policyUri"=?,
+      "tosUri"=?,
+      "postLogoutRedirectUrisJson"=?,
+      "jwksUri"=?,
+      "allowedGrantTypes"=?,
+      "accessTokenTtlSeconds"=?,
+      "refreshTokenTtlDays"=?,
+      "authorizationCodeTtlMinutes"=?,
       "updatedAt"=?
-      WHERE "id"=?`,
+      WHERE "applicationId"=?`,
     args: [
-      name,
       clientSecretHash,
       redirectUrisJson,
       allowedScopes,
@@ -312,19 +363,32 @@ export async function updateOAuth2ClientAdmin(
       refreshTokenTtlDays,
       authorizationCodeTtlMinutes,
       t,
-      id,
+      applicationId,
     ],
   })
 
-  const dto = await getOAuth2ClientAdminById(id)
+  const dto = await getOAuth2ClientAdminById(applicationId)
   if (!dto) throw new Error('更新后读取失败')
   return { dto, plainSecret }
 }
 
-export async function deleteOAuth2ClientAdmin(id: string): Promise<boolean> {
+/** 解除 IdP 配置：删除 OAuth2Client；若应用下无功能模块则删除整条应用记录 */
+export async function deleteOAuth2ClientAdmin(applicationId: string): Promise<boolean> {
   const db = getDb()
-  const sel = await db.execute({ sql: `SELECT 1 FROM "OAuth2Client" WHERE "id" = ?`, args: [id] })
-  if (!sel.rows[0]) return false
-  await db.execute({ sql: `DELETE FROM "OAuth2Client" WHERE "id" = ?`, args: [id] })
+  const appRow = await db.execute({ sql: `SELECT 1 FROM "Application" WHERE "id" = ?`, args: [applicationId] })
+  if (!appRow.rows[0]) return false
+
+  const fc = await db.execute({
+    sql: `SELECT COUNT(*) as c FROM "Feature" WHERE "applicationId" = ?`,
+    args: [applicationId],
+  })
+  const featureCount = Number((fc.rows[0] as unknown as { c: number }).c)
+
+  if (featureCount > 0) {
+    await db.execute({ sql: `DELETE FROM "OAuth2Client" WHERE "applicationId" = ?`, args: [applicationId] })
+    return true
+  }
+
+  await db.execute({ sql: `DELETE FROM "Application" WHERE "id" = ?`, args: [applicationId] })
   return true
 }
