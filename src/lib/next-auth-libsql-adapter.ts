@@ -112,7 +112,7 @@ export function LibsqlAdapter(): Adapter {
         args: [
           id,
           data.userId,
-          data.type,
+          String(data.type ?? 'oauth'),
           data.provider,
           data.providerAccountId,
           data.refresh_token ?? null,
@@ -122,7 +122,7 @@ export function LibsqlAdapter(): Adapter {
           data.scope ?? null,
           data.id_token ?? null,
           data.session_state ?? null,
-        ],
+        ] as (string | number | boolean | null)[],
       })
     },
 

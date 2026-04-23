@@ -1,6 +1,6 @@
 # RBAC Template
 
-基于 **Next.js 16**（App Router）、**@libsql/client**（直连 SQL + 轻量数据层）、**Tailwind CSS v4** 与 **shadcn/ui** 的全栈 **RBAC**（基于角色的访问控制）后台模板。认证使用 **NextAuth v4**（邮箱密码 + GitHub / Google OAuth）。
+基于 **Next.js 16**（App Router）、**@libsql/client**（直连 SQL + 轻量数据层）、**Tailwind CSS v4** 与 **shadcn/ui** 的全栈 **RBAC**（基于角色的访问控制）后台模板。认证使用 **NextAuth.js / Auth.js v5**（`next-auth@5` beta：邮箱密码 + GitHub / Google + 可选 Generic OIDC）。
 
 ---
 
@@ -22,7 +22,7 @@
 | 框架 | Next.js 16 App Router、React 19 |
 | 数据库 | [Turso](https://turso.tech) / LibSQL，[`@libsql/client`](https://github.com/tursodatabase/libsql-client-ts) |
 | 数据访问 | `src/lib/data-access.ts`（手写 SQL）；NextAuth 适配器见 `src/lib/next-auth-libsql-adapter.ts` |
-| 认证 | NextAuth v4（JWT Session + 自定义 LibSQL Adapter） |
+| 认证 | Auth.js / NextAuth v5（JWT Session + 自定义 LibSQL Adapter；可选 `AUTH_OIDC_*` Generic OIDC） |
 | UI | Tailwind CSS v4、shadcn/ui、next-themes、站内 i18n（中/英） |
 
 ---

@@ -173,6 +173,7 @@ export default function ProfilePage() {
   function providerLabel(p: string) {
     if (p === 'github') return t('profile.providerGithub')
     if (p === 'google') return t('profile.providerGoogle')
+    if (p === 'oidc') return t('profile.providerOidc')
     return p
   }
 
@@ -200,8 +201,10 @@ export default function ProfilePage() {
 
   const hasGithub = providerKeys.includes('github')
   const hasGoogle = providerKeys.includes('google')
+  const hasOidc = providerKeys.includes('oidc')
   const linkedGithub = accounts.some((a) => a.provider === 'github')
   const linkedGoogle = accounts.some((a) => a.provider === 'google')
+  const linkedOidc = accounts.some((a) => a.provider === 'oidc')
 
   return (
     <PageShell>
@@ -310,7 +313,12 @@ export default function ProfilePage() {
                     {t('profile.bindGoogle')}
                   </Button>
                 ) : null}
-                {!hasGithub && !hasGoogle ? (
+                {hasOidc && !linkedOidc ? (
+                  <Button type="button" variant="outline" onClick={() => signIn('oidc', { callbackUrl: '/profile' })}>
+                    {t('profile.bindOidc')}
+                  </Button>
+                ) : null}
+                {!hasGithub && !hasGoogle && !hasOidc ? (
                   <p className="text-sm text-muted-foreground">
                     {t('profile.noOauthConfigured')}{' '}
                     <Link href="/system-config" className="text-primary underline-offset-4 hover:underline">

@@ -297,6 +297,7 @@ export const en: Messages = {
       'No password is set yet (for example you signed in with OAuth only). Set a new password below to enable email & password sign-in.',
     bindGithub: 'Link GitHub',
     bindGoogle: 'Link Google',
+    bindOidc: 'Link OIDC',
     bindHint:
       'While signed in, complete the provider flow to link that account to your user (must match OAuth settings in System config).',
     unlink: 'Unlink',
@@ -316,6 +317,7 @@ export const en: Messages = {
     emailTaken: 'That email is already in use',
     providerGithub: 'GitHub',
     providerGoogle: 'Google',
+    providerOidc: 'OIDC',
     noOauthConfigured: 'No usable OAuth sign-in is configured (or credentials are still placeholders). Configure under',
     goSystemConfig: 'Settings → OAuth2',
   },
@@ -328,6 +330,7 @@ export const en: Messages = {
     signingIn: 'Signing in…',
     oauthGithub: 'Continue with GitHub',
     oauthGoogle: 'Continue with Google',
+    oauthOidc: 'Continue with OIDC',
     errorCredentials: 'Invalid email or password',
     errorGeneric: 'Sign-in failed. Try again.',
     errorOAuthSignin: 'OAuth sign-in failed. Check provider settings and redirect URLs.',

@@ -48,6 +48,7 @@ export function LoginForm() {
   const hasCredentials = providers?.includes('credentials')
   const hasGithub = providers?.includes('github')
   const hasGoogle = providers?.includes('google')
+  const hasOidc = providers?.includes('oidc')
 
   async function onCredentialsSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -92,7 +93,7 @@ export function LoginForm() {
           <p className="text-center text-sm text-muted-foreground">{t('common.loading')}</p>
         ) : (
           <div className="space-y-6">
-            {(hasGithub || hasGoogle) && (
+            {(hasGithub || hasGoogle || hasOidc) && (
               <div className="flex flex-col gap-2">
                 {hasGithub && (
                   <Button
@@ -122,10 +123,24 @@ export function LoginForm() {
                     {t('login.oauthGoogle')}
                   </Button>
                 )}
+                {hasOidc && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={busy}
+                    onClick={() => {
+                      setBusy(true)
+                      void signIn('oidc', { callbackUrl })
+                    }}
+                  >
+                    {t('login.oauthOidc')}
+                  </Button>
+                )}
               </div>
             )}
 
-            {hasCredentials && (hasGithub || hasGoogle) ? (
+            {hasCredentials && (hasGithub || hasGoogle || hasOidc) ? (
               <div className="relative">
                 <div className="absolute inset-0 flex items-center" aria-hidden>
                   <span className="w-full border-t border-border" />
