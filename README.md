@@ -36,7 +36,7 @@
 | `pnpm start` | 启动生产构建产物 |
 | `pnpm run typecheck` | TypeScript 检查 |
 | `pnpm run lint` | ESLint |
-| `pnpm run db:apply-sql` | 将 `sql/schema.sql` 应用到 `DATABASE_URL` 指向的库（默认文件路径；可传参：`pnpm run db:apply-sql /path/to.sql`） |
+| `pnpm run db:apply-sql` | 将 `sql/schema.sql`（或指定 `.sql`）应用到库；`schema.sql` 中 DDL 为 `IF NOT EXISTS`，已建库可重复执行以补表/索引。默认应用 `schema.sql` 时若检测到旧版 `OAuth2Client`（无 `applicationId`），会先 `DROP` 该表再建表（IdP 配置清空，需重配或 `pnpm run seed`） |
 | `pnpm run db:apply-sql sql/migrations/002_oauth2_authorization_server.sql` | 旧库仅补 OAuth2 表时使用（新库已含于 `sql/schema.sql`） |
 | `pnpm run db:apply-sql sql/migrations/005_oauth2_client_application_fk.sql` | 仅当库里 `Application` 仍带 `oauthClientId` 等列时执行一次（见 `sql/migrations/README.md`） |
 | `pnpm run seed` | 写入初始数据（依赖 `.env` 中 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`） |

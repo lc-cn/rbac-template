@@ -1,6 +1,6 @@
--- LibSQL / Turso：空库一键建表（聚合 DDL）。表结构演进请先写 sql/migrations/NNN_*.sql，再把本文件维护到与迁移终点一致。应用：pnpm run db:apply-sql sql/schema.sql
+-- LibSQL / Turso：聚合 DDL（建表/索引均 IF NOT EXISTS，可对已建库重复执行以补齐缺表缺索引）。表结构演进请先写 sql/migrations/NNN_*.sql 再同步本文件。应用：pnpm run db:apply-sql sql/schema.sql
 
-CREATE TABLE "User" (
+CREATE TABLE IF NOT EXISTS "User" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE "User" (
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE "Account" (
+CREATE TABLE IF NOT EXISTS "Account" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE "Account" (
     CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "Session" (
+CREATE TABLE IF NOT EXISTS "Session" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "sessionToken" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -37,13 +37,13 @@ CREATE TABLE "Session" (
     CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "VerificationToken" (
+CREATE TABLE IF NOT EXISTS "VerificationToken" (
     "identifier" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expires" DATETIME NOT NULL
 );
 
-CREATE TABLE "Role" (
+CREATE TABLE IF NOT EXISTS "Role" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -51,7 +51,7 @@ CREATE TABLE "Role" (
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE "UserRole" (
+CREATE TABLE IF NOT EXISTS "UserRole" (
     "userId" TEXT NOT NULL,
     "roleId" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -60,7 +60,7 @@ CREATE TABLE "UserRole" (
     CONSTRAINT "UserRole_roleId_fkey" FOREIGN KEY ("roleId") REFERENCES "Role" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "Application" (
+CREATE TABLE IF NOT EXISTS "Application" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE "Application" (
 );
 
 -- IdP OAuth2/OIDC 客户端：一条应用最多一条（applicationId UNIQUE），展示名用 Application.name
-CREATE TABLE "OAuth2Client" (
+CREATE TABLE IF NOT EXISTS "OAuth2Client" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "applicationId" TEXT NOT NULL,
     "clientId" TEXT NOT NULL,
@@ -93,7 +93,7 @@ CREATE TABLE "OAuth2Client" (
     CONSTRAINT "OAuth2Client_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "Feature" (
+CREATE TABLE IF NOT EXISTS "Feature" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE "Feature" (
     CONSTRAINT "Feature_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "Permission" (
+CREATE TABLE IF NOT EXISTS "Permission" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "code" TEXT NOT NULL,
@@ -115,7 +115,7 @@ CREATE TABLE "Permission" (
     CONSTRAINT "Permission_featureId_fkey" FOREIGN KEY ("featureId") REFERENCES "Feature" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "RolePermission" (
+CREATE TABLE IF NOT EXISTS "RolePermission" (
     "roleId" TEXT NOT NULL,
     "permissionId" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -124,7 +124,7 @@ CREATE TABLE "RolePermission" (
     CONSTRAINT "RolePermission_permissionId_fkey" FOREIGN KEY ("permissionId") REFERENCES "Permission" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE TABLE "SystemConfig" (
+CREATE TABLE IF NOT EXISTS "SystemConfig" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "key" TEXT NOT NULL,
     "value" TEXT NOT NULL,
@@ -134,7 +134,7 @@ CREATE TABLE "SystemConfig" (
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE "OAuthProvider" (
+CREATE TABLE IF NOT EXISTS "OAuthProvider" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -145,22 +145,22 @@ CREATE TABLE "OAuthProvider" (
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
-CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
-CREATE UNIQUE INDEX "Session_sessionToken_key" ON "Session"("sessionToken");
-CREATE UNIQUE INDEX "VerificationToken_token_key" ON "VerificationToken"("token");
-CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
-CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
-CREATE UNIQUE INDEX "Application_name_key" ON "Application"("name");
-CREATE UNIQUE INDEX "Application_code_key" ON "Application"("code");
-CREATE UNIQUE INDEX "OAuth2Client_applicationId_key" ON "OAuth2Client"("applicationId");
-CREATE UNIQUE INDEX "OAuth2Client_clientId_key" ON "OAuth2Client"("clientId");
-CREATE UNIQUE INDEX "Feature_applicationId_code_key" ON "Feature"("applicationId", "code");
-CREATE UNIQUE INDEX "Permission_code_key" ON "Permission"("code");
-CREATE UNIQUE INDEX "SystemConfig_key_key" ON "SystemConfig"("key");
-CREATE UNIQUE INDEX "OAuthProvider_name_key" ON "OAuthProvider"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
+CREATE UNIQUE INDEX IF NOT EXISTS "Session_sessionToken_key" ON "Session"("sessionToken");
+CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_token_key" ON "VerificationToken"("token");
+CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
+CREATE UNIQUE INDEX IF NOT EXISTS "Role_name_key" ON "Role"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Application_name_key" ON "Application"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Application_code_key" ON "Application"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "OAuth2Client_applicationId_key" ON "OAuth2Client"("applicationId");
+CREATE UNIQUE INDEX IF NOT EXISTS "OAuth2Client_clientId_key" ON "OAuth2Client"("clientId");
+CREATE UNIQUE INDEX IF NOT EXISTS "Feature_applicationId_code_key" ON "Feature"("applicationId", "code");
+CREATE UNIQUE INDEX IF NOT EXISTS "Permission_code_key" ON "Permission"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "SystemConfig_key_key" ON "SystemConfig"("key");
+CREATE UNIQUE INDEX IF NOT EXISTS "OAuthProvider_name_key" ON "OAuthProvider"("name");
 
-CREATE TABLE "OAuth2AuthorizationCode" (
+CREATE TABLE IF NOT EXISTS "OAuth2AuthorizationCode" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "code" TEXT NOT NULL,
     "clientId" TEXT NOT NULL,
@@ -175,11 +175,11 @@ CREATE TABLE "OAuth2AuthorizationCode" (
     CONSTRAINT "OAuth2AuthorizationCode_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE UNIQUE INDEX "OAuth2AuthorizationCode_code_key" ON "OAuth2AuthorizationCode"("code");
-CREATE INDEX "OAuth2AuthorizationCode_expiresAt_idx" ON "OAuth2AuthorizationCode"("expiresAt");
+CREATE UNIQUE INDEX IF NOT EXISTS "OAuth2AuthorizationCode_code_key" ON "OAuth2AuthorizationCode"("code");
+CREATE INDEX IF NOT EXISTS "OAuth2AuthorizationCode_expiresAt_idx" ON "OAuth2AuthorizationCode"("expiresAt");
 
 -- 刷新令牌（offline_access / refresh_token 授权）
-CREATE TABLE "OAuth2RefreshToken" (
+CREATE TABLE IF NOT EXISTS "OAuth2RefreshToken" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "tokenHash" TEXT NOT NULL,
     "clientId" TEXT NOT NULL,
@@ -191,6 +191,6 @@ CREATE TABLE "OAuth2RefreshToken" (
     "createdAt" TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE UNIQUE INDEX "OAuth2RefreshToken_tokenHash_key" ON "OAuth2RefreshToken"("tokenHash");
-CREATE INDEX "OAuth2RefreshToken_clientId_idx" ON "OAuth2RefreshToken"("clientId");
-CREATE INDEX "OAuth2RefreshToken_expiresAt_idx" ON "OAuth2RefreshToken"("expiresAt");
+CREATE UNIQUE INDEX IF NOT EXISTS "OAuth2RefreshToken_tokenHash_key" ON "OAuth2RefreshToken"("tokenHash");
+CREATE INDEX IF NOT EXISTS "OAuth2RefreshToken_clientId_idx" ON "OAuth2RefreshToken"("clientId");
+CREATE INDEX IF NOT EXISTS "OAuth2RefreshToken_expiresAt_idx" ON "OAuth2RefreshToken"("expiresAt");
