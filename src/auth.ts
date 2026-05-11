@@ -1,11 +1,13 @@
 import NextAuth from 'next-auth'
 import type { NextAuthConfig } from 'next-auth'
+import { encode as defaultEncode } from 'next-auth/jwt'
 import Credentials from 'next-auth/providers/credentials'
 import { findUserByEmail, getUserTenantMembership, resolveJwtTenantClaims } from '@/lib/data-access'
 import type { TenantRole } from '@/lib/data-access'
 import { verifyStoredPassword } from '@/lib/password'
 import { LibsqlAdapter } from '@/lib/next-auth-libsql-adapter'
 import { getAuthSecret } from '@/lib/auth-secret'
+import { getUserCredentialVersion, getUserMfaRow } from '@/lib/security-data-access'
 
 const providers: NextAuthConfig['providers'] = [
   Credentials({
@@ -25,12 +27,14 @@ const providers: NextAuthConfig['providers'] = [
       if (!user.status) return null
 
       const profileImage = user.image ?? user.avatar ?? undefined
+      const mfaRow = await getUserMfaRow(user.id)
 
       return {
         id: user.id,
         name: user.name,
         email: user.email,
         image: profileImage,
+        requiresMfa: !!(mfaRow?.mfaEnabled ?? false),
       }
     },
   }),
@@ -48,6 +52,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: '/login',
   },
   providers,
+  jwt: {
+    encode: async (params) => {
+      const token = params.token as { mfaPending?: boolean; mfaDeadline?: number } | undefined
+      if (token?.mfaPending === true && typeof token.mfaDeadline === 'number') {
+        const nowSec = Math.floor(Date.now() / 1000)
+        const maxAge = Math.max(1, token.mfaDeadline - nowSec)
+        return defaultEncode({ ...params, maxAge })
+      }
+      return defaultEncode(params)
+    },
+  },
   callbacks: {
     async redirect({ url, baseUrl }) {
       if (url.startsWith('/')) return `${baseUrl}${url}`
@@ -64,6 +79,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async jwt({ token, user, trigger, session }) {
       if (user?.id) {
+        const u = user as { requiresMfa?: boolean }
         token.sub = user.id
         token.id = user.id
         token.name = user.name ?? undefined
@@ -73,6 +89,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.currentTenantId = claims.currentTenantId
         token.isPlatformAdmin = claims.isPlatformAdmin
         token.tenantRole = claims.tenantRole
+        token.credentialVersion = await getUserCredentialVersion(user.id)
+        if (u.requiresMfa) {
+          token.mfaPending = true
+          token.mfaDeadline = Math.floor(Date.now() / 1000) + 600
+        } else {
+          delete token.mfaPending
+          delete token.mfaDeadline
+        }
+      }
+      if (token.sub && !user?.id) {
+        const dbV = await getUserCredentialVersion(String(token.sub))
+        if (token.credentialVersion === undefined) {
+          token.credentialVersion = dbV
+        } else if (token.credentialVersion !== dbV) {
+          return null
+        }
       }
       if (trigger === 'update' && session && typeof session === 'object') {
         const s = session as {
@@ -112,6 +144,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const tr = token.tenantRole
       session.tenantRole =
         tr === 'owner' || tr === 'admin' || tr === 'member' ? (tr as TenantRole) : null
+      session.mfaPending = !!token.mfaPending
       return session
     },
   },

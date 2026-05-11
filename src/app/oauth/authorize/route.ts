@@ -17,6 +17,11 @@ export async function GET(req: NextRequest) {
     login.searchParams.set('callbackUrl', `${req.nextUrl.pathname}${req.nextUrl.search}`)
     return NextResponse.redirect(login)
   }
+  if (session.mfaPending) {
+    const mfa = new URL('/mfa', req.nextUrl.origin)
+    mfa.searchParams.set('callbackUrl', `${req.nextUrl.pathname}${req.nextUrl.search}`)
+    return NextResponse.redirect(mfa)
+  }
 
   const consent = new URL('/oauth/consent', req.nextUrl.origin)
   consent.search = req.nextUrl.search

@@ -41,6 +41,9 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
+  if (session.mfaPending) {
+    return NextResponse.json({ error: 'mfa_required' }, { status: 403 })
+  }
 
   if (action === 'deny') {
     return oauthErrRedirect(redirectUri, 'access_denied', '用户拒绝授权', state)

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { changeUserPassword } from '@/lib/data-access'
-import { getServerAuthSession } from '@/lib/session'
+import { requireBusinessSession } from '@/lib/console-auth'
 
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerAuthSession()
-    const userId = session?.user?.id
-    if (!userId) return NextResponse.json({ error: '未登录' }, { status: 401 })
+    const gate = await requireBusinessSession()
+    if (!gate.ok) return gate.response
+    const userId = gate.userId
 
     const body = (await request.json()) as { currentPassword?: unknown; newPassword?: unknown }
     const newPassword = typeof body.newPassword === 'string' ? body.newPassword : ''

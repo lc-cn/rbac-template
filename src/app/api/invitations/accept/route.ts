@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import { consumeInvitationByPlainToken } from '@/lib/data-access'
+import { requireBusinessSession } from '@/lib/console-auth'
 
 /**
  * 接受租户邀请（需在登录态下调用；无需当前租户上下文）。
@@ -8,10 +8,11 @@ import { consumeInvitationByPlainToken } from '@/lib/data-access'
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    const uid = session?.user?.id
-    const email = session?.user?.email
-    if (!uid || !email) {
+    const gate = await requireBusinessSession()
+    if (!gate.ok) return gate.response
+    const uid = gate.userId
+    const email = gate.session.user.email
+    if (!email) {
       return NextResponse.json({ error: '未登录或会话缺少邮箱' }, { status: 401 })
     }
     const body = (await request.json()) as { token?: unknown }

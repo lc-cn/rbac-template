@@ -4,6 +4,9 @@ import type { AppSession } from '@/types/session'
 export function requireUserId(session: AppSession | null): string | NextResponse {
   const id = session?.user?.id
   if (!id) return NextResponse.json({ error: '未登录' }, { status: 401 })
+  if (session.mfaPending) {
+    return NextResponse.json({ error: '需要完成多因素验证' }, { status: 403 })
+  }
   return id
 }
 

@@ -5,6 +5,7 @@ import { signOut, useSession } from 'next-auth/react'
 import { PageShell, PageHeader } from '@/components/layout/page-shell'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -17,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { ProfileSecurityCard } from '@/components/profile/profile-security-card'
 import { useToast } from '@/hooks/use-toast'
 import { useI18n } from '@/i18n/context'
 
@@ -171,107 +173,138 @@ export default function ProfilePage() {
   }
 
   return (
-    <PageShell>
+    <PageShell density="comfortable">
       <PageHeader title={t('profile.title')} description={t('profile.subtitle')} />
 
       {loading ? (
         <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
       ) : !user ? null : (
-        <div className="space-y-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('profile.sectionProfile')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={onSaveProfile} className="max-w-xl space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pf-name">{t('profile.name')}</Label>
-                  <Input id="pf-name" value={name} onChange={(e) => setName(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pf-email">{t('profile.email')}</Label>
-                  <Input id="pf-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pf-image">{t('profile.imageUrl')}</Label>
-                  <Input id="pf-image" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pf-avatar">{t('profile.avatarUrl')}</Label>
-                  <Input id="pf-avatar" value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="https://…" />
-                </div>
-                <Button type="submit" disabled={savingProfile}>
-                  {savingProfile ? t('common.loading') : t('profile.saveProfile')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+        <Tabs defaultValue="general" className="w-full min-w-0">
+          <TabsList
+            aria-label={t('profile.title')}
+            className="mb-6 h-auto w-full flex-wrap justify-stretch gap-1 p-1.5 sm:mb-8 sm:inline-flex sm:w-auto sm:justify-start"
+          >
+            <TabsTrigger value="general" className="min-w-0 flex-1 sm:flex-initial">
+              {t('profile.tabGeneral')}
+            </TabsTrigger>
+            <TabsTrigger value="password" className="min-w-0 flex-1 sm:flex-initial">
+              {t('profile.tabPassword')}
+            </TabsTrigger>
+            <TabsTrigger value="security" className="min-w-0 flex-1 sm:flex-initial">
+              {t('profile.tabSecurity')}
+            </TabsTrigger>
+            <TabsTrigger
+              value="danger"
+              className="min-w-0 flex-1 border-destructive/25 text-destructive/90 data-[state=active]:border-destructive/40 data-[state=active]:text-destructive sm:flex-initial"
+            >
+              {t('profile.tabDanger')}
+            </TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('profile.sectionPassword')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {!user.hasPassword ? (
-                <p className="mb-4 text-sm text-muted-foreground">{t('profile.noPasswordHint')}</p>
-              ) : null}
-              <form onSubmit={onChangePassword} className="max-w-xl space-y-4">
-                {user.hasPassword ? (
+          <TabsContent value="general" forceMount className="mt-0 data-[state=inactive]:hidden">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t('profile.sectionProfile')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={onSaveProfile} className="max-w-xl space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="pf-cur-pw">{t('profile.currentPassword')}</Label>
+                    <Label htmlFor="pf-name">{t('profile.name')}</Label>
+                    <Input id="pf-name" value={name} onChange={(e) => setName(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pf-email">{t('profile.email')}</Label>
+                    <Input id="pf-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pf-image">{t('profile.imageUrl')}</Label>
+                    <Input id="pf-image" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://…" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="pf-avatar">{t('profile.avatarUrl')}</Label>
+                    <Input id="pf-avatar" value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="https://…" />
+                  </div>
+                  <Button type="submit" disabled={savingProfile}>
+                    {savingProfile ? t('common.loading') : t('profile.saveProfile')}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="password" forceMount className="mt-0 data-[state=inactive]:hidden">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t('profile.sectionPassword')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!user.hasPassword ? (
+                  <p className="mb-4 text-sm text-muted-foreground">{t('profile.noPasswordHint')}</p>
+                ) : null}
+                <form onSubmit={onChangePassword} className="max-w-xl space-y-4">
+                  {user.hasPassword ? (
+                    <div className="space-y-2">
+                      <Label htmlFor="pf-cur-pw">{t('profile.currentPassword')}</Label>
+                      <Input
+                        id="pf-cur-pw"
+                        type="password"
+                        autoComplete="current-password"
+                        value={curPw}
+                        onChange={(e) => setCurPw(e.target.value)}
+                        required={user.hasPassword}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="space-y-2">
+                    <Label htmlFor="pf-new-pw">{t('profile.newPassword')}</Label>
                     <Input
-                      id="pf-cur-pw"
+                      id="pf-new-pw"
                       type="password"
-                      autoComplete="current-password"
-                      value={curPw}
-                      onChange={(e) => setCurPw(e.target.value)}
-                      required={user.hasPassword}
+                      autoComplete="new-password"
+                      value={newPw}
+                      onChange={(e) => setNewPw(e.target.value)}
+                      required
+                      minLength={6}
                     />
                   </div>
-                ) : null}
-                <div className="space-y-2">
-                  <Label htmlFor="pf-new-pw">{t('profile.newPassword')}</Label>
-                  <Input
-                    id="pf-new-pw"
-                    type="password"
-                    autoComplete="new-password"
-                    value={newPw}
-                    onChange={(e) => setNewPw(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pf-new-pw2">{t('profile.confirmNewPassword')}</Label>
-                  <Input
-                    id="pf-new-pw2"
-                    type="password"
-                    autoComplete="new-password"
-                    value={newPw2}
-                    onChange={(e) => setNewPw2(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <Button type="submit" disabled={savingPw}>
-                  {savingPw ? t('common.loading') : t('profile.changePassword')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                  <div className="space-y-2">
+                    <Label htmlFor="pf-new-pw2">{t('profile.confirmNewPassword')}</Label>
+                    <Input
+                      id="pf-new-pw2"
+                      type="password"
+                      autoComplete="new-password"
+                      value={newPw2}
+                      onChange={(e) => setNewPw2(e.target.value)}
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                  <Button type="submit" disabled={savingPw}>
+                    {savingPw ? t('common.loading') : t('profile.changePassword')}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-          <Card className="border-destructive/40">
-            <CardHeader>
-              <CardTitle className="text-base text-destructive">{t('profile.sectionDanger')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 max-w-xl text-sm text-muted-foreground">{t('profile.deleteWarning')}</p>
-              <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
-                {t('profile.deleteAccount')}
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+          <TabsContent value="security" forceMount className="mt-0 data-[state=inactive]:hidden">
+            <ProfileSecurityCard hasPassword={user.hasPassword} />
+          </TabsContent>
+
+          <TabsContent value="danger" className="mt-0 focus-visible:outline-none data-[state=inactive]:hidden">
+            <Card className="border-destructive/40">
+              <CardHeader>
+                <CardTitle className="text-base text-destructive">{t('profile.sectionDanger')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-4 max-w-xl text-sm text-muted-foreground">{t('profile.deleteWarning')}</p>
+                <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
+                  {t('profile.deleteAccount')}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       )}
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>

@@ -26,7 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [mobileNavOpen])
 
   return (
-    <div className="flex min-h-screen min-w-0 bg-transparent">
+    <div className="flex h-dvh max-h-dvh min-h-0 min-w-0 overflow-hidden bg-transparent">
       <Sidebar collapsed={effectiveCollapsed} onToggleCollapsed={toggleCollapsed} />
 
       {mobileNavOpen ? (
@@ -38,7 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMobileNavOpen(false)}
           />
           <aside
-            className="fixed left-0 top-0 z-50 flex h-[100dvh] w-[min(20rem,88vw)] max-w-full flex-col border-r border-border/40 bg-card shadow-float ring-1 ring-black/[0.04] dark:ring-white/10 md:hidden"
+            className="fixed left-0 top-0 z-50 flex h-[100dvh] max-h-[100dvh] min-h-0 w-[min(20rem,88vw)] max-w-full flex-col overflow-hidden border-r border-border/40 bg-card shadow-float ring-1 ring-black/[0.04] dark:ring-white/10 md:hidden"
             role="dialog"
             aria-modal="true"
           >

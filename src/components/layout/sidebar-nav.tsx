@@ -62,7 +62,7 @@ export function SidebarNav({
   const allNav = [...navItems, ...platformItem]
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div
         className={cn(
           'relative shrink-0 border-b border-border/40 px-3 pb-4 pt-3 sm:px-4 sm:pb-5 sm:pt-4',
@@ -101,7 +101,7 @@ export function SidebarNav({
       </div>
       <nav
         className={cn(
-          'min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3 sm:px-3 sm:py-4',
+          'min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-smooth px-2 py-3 sm:px-3 sm:py-4',
           collapsed && 'px-1.5 sm:px-1.5'
         )}
       >

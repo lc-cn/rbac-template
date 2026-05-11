@@ -3,7 +3,9 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { signIn } from 'next-auth/react'
+import { getCsrfToken, signIn } from 'next-auth/react'
+import { startAuthentication } from '@simplewebauthn/browser'
+import type { AuthenticationResponseJSON } from '@simplewebauthn/types'
 import { BookOpen, ChevronRight, LayoutDashboard } from 'lucide-react'
 import { useI18n } from '@/i18n/context'
 import { Button } from '@/components/ui/button'
@@ -22,6 +24,7 @@ export function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') ?? '/'
   const urlError = searchParams.get('error')
 
+  const [mode, setMode] = useState<'password' | 'passkey'>('password')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -54,6 +57,60 @@ export function LoginForm() {
     }
   }
 
+  async function onPasskeyLogin() {
+    const em = email.trim()
+    if (!em) {
+      setCredError(t('login.errorCredentials'))
+      return
+    }
+    setBusy(true)
+    setCredError(null)
+    try {
+      const csrf = await getCsrfToken()
+      if (!csrf) {
+        setCredError(t('login.errorGeneric'))
+        return
+      }
+      const optRes = await fetch('/api/auth/passkey/login-options', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: em, csrfToken: csrf }),
+      })
+      const optData = await optRes.json()
+      if (!optRes.ok) {
+        setCredError(optData.error ?? t('login.errorGeneric'))
+        return
+      }
+      const credential = (await startAuthentication({
+        optionsJSON: optData.options,
+      })) as AuthenticationResponseJSON
+
+      const verifyRes = await fetch('/api/auth/passkey/login-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          csrfToken: csrf,
+          challengeId: optData.challengeId,
+          credential,
+        }),
+      })
+      const verifyData = await verifyRes.json()
+      if (!verifyRes.ok) {
+        setCredError(verifyData.error ?? t('login.errorGeneric'))
+        return
+      }
+      const next =
+        verifyData.mfaPending === true
+          ? `/mfa?callbackUrl=${encodeURIComponent(callbackUrl)}`
+          : callbackUrl
+      window.location.href = next
+    } catch {
+      setCredError(t('login.errorGeneric'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-4 py-12 sm:py-16">
       <header className="mb-8 text-center sm:mb-10">
@@ -67,6 +124,30 @@ export function LoginForm() {
 
       <div className="rounded-2xl border border-border/60 bg-card/95 p-6 shadow-xl shadow-black/[0.04] ring-1 ring-black/[0.04] backdrop-blur-sm dark:bg-card/90 dark:ring-white/[0.06] sm:p-7">
         <h2 className="mb-5 text-center text-base font-semibold tracking-tight text-foreground">{t('login.title')}</h2>
+        <div className="mb-5 flex gap-2 rounded-xl bg-muted/50 p-1">
+          <Button
+            type="button"
+            variant={mode === 'password' ? 'secondary' : 'ghost'}
+            className="flex-1"
+            onClick={() => {
+              setMode('password')
+              setCredError(null)
+            }}
+          >
+            {t('login.modePassword')}
+          </Button>
+          <Button
+            type="button"
+            variant={mode === 'passkey' ? 'secondary' : 'ghost'}
+            className="flex-1"
+            onClick={() => {
+              setMode('passkey')
+              setCredError(null)
+            }}
+          >
+            {t('login.modePasskey')}
+          </Button>
+        </div>
         {authBanner ? (
           <div
             role="alert"
@@ -75,39 +156,66 @@ export function LoginForm() {
             {authBanner}
           </div>
         ) : null}
-        <form onSubmit={onCredentialsSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="login-email">{t('login.email')}</Label>
-            <Input
-              id="login-email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value)
-                setCredError(null)
-              }}
-            />
+        {mode === 'password' ? (
+          <form onSubmit={onCredentialsSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="login-email">{t('login.email')}</Label>
+              <Input
+                id="login-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setCredError(null)
+                }}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="login-password">{t('common.password')}</Label>
+              <Input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setCredError(null)
+                }}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? t('login.signingIn') : t('login.signIn')}
+            </Button>
+          </form>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="login-email-pk">{t('login.email')}</Label>
+              <Input
+                id="login-email-pk"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  setCredError(null)
+                }}
+              />
+            </div>
+            <Button type="button" className="w-full" disabled={busy} onClick={() => void onPasskeyLogin()}>
+              {busy ? t('login.passkeyBusy') : t('login.passkeySignIn')}
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="login-password">{t('common.password')}</Label>
-            <Input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value)
-                setCredError(null)
-              }}
-            />
-          </div>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? t('login.signingIn') : t('login.signIn')}
-          </Button>
-        </form>
+        )}
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          <Link href="/recover/mfa" className="underline underline-offset-2 hover:text-foreground">
+            {t('login.recoveryLink')}
+          </Link>
+        </p>
       </div>
 
       <aside

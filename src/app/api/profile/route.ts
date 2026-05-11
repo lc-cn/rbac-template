@@ -5,13 +5,13 @@ import {
   updateUserSelfProfile,
   verifySelfDeleteAccount,
 } from '@/lib/data-access'
-import { getServerAuthSession } from '@/lib/session'
+import { requireBusinessSession } from '@/lib/console-auth'
 
 export async function GET() {
   try {
-    const session = await getServerAuthSession()
-    const userId = session?.user?.id
-    if (!userId) return NextResponse.json({ error: '未登录' }, { status: 401 })
+    const gate = await requireBusinessSession()
+    if (!gate.ok) return gate.response
+    const userId = gate.userId
 
     const user = await getUserByIdGlobal(userId)
     if (!user) return NextResponse.json({ error: '用户不存在' }, { status: 404 })
@@ -36,9 +36,9 @@ export async function GET() {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerAuthSession()
-    const userId = session?.user?.id
-    if (!userId) return NextResponse.json({ error: '未登录' }, { status: 401 })
+    const gate = await requireBusinessSession()
+    if (!gate.ok) return gate.response
+    const userId = gate.userId
 
     const body = (await request.json()) as {
       name?: unknown
@@ -92,9 +92,9 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerAuthSession()
-    const userId = session?.user?.id
-    if (!userId) return NextResponse.json({ error: '未登录' }, { status: 401 })
+    const gate = await requireBusinessSession()
+    if (!gate.ok) return gate.response
+    const userId = gate.userId
 
     const body = (await request.json()) as { password?: unknown; confirmEmail?: unknown }
     const password = typeof body.password === 'string' ? body.password : undefined

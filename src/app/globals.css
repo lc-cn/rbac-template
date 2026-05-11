@@ -27,7 +27,8 @@
     --radius: 1rem;
     --overlay: 0 0% 8%;
     /* 布局节奏（与 @layer components 同步，便于主题扩展） */
-    --layout-max-w: 80rem;
+    /* wide 版心：占满主栏宽度，避免大屏左右大块留白；表单页用 .app-page--narrow 另限 max-w-3xl */
+    --layout-max-w: 100%;
     --layout-page-px: 1rem;
     --layout-page-py: 1.5rem;
     --layout-section-gap: 2rem;

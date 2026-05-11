@@ -11,6 +11,7 @@ declare module 'next-auth' {
     currentTenantId?: string | null
     isPlatformAdmin?: boolean
     tenantRole?: TenantRole | null
+    mfaPending?: boolean
   }
 }
 
@@ -23,5 +24,8 @@ declare module 'next-auth/jwt' {
     currentTenantId?: string | null
     isPlatformAdmin?: boolean
     tenantRole?: TenantRole | null
+    mfaPending?: boolean
+    mfaDeadline?: number
+    credentialVersion?: number
   }
 }
