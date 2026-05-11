@@ -5,10 +5,12 @@ import { usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/sidebar'
 import { SidebarNav } from '@/components/layout/sidebar-nav'
 import { AppNavbar } from '@/components/layout/app-navbar'
+import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed'
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const pathname = usePathname()
+  const { effectiveCollapsed, toggleCollapsed } = useSidebarCollapsed()
 
   useEffect(() => {
     setMobileNavOpen(false)
@@ -23,13 +25,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [mobileNavOpen])
 
-  if (pathname === '/login') {
-    return <>{children}</>
-  }
-
   return (
     <div className="flex min-h-screen min-w-0 bg-transparent">
-      <Sidebar />
+      <Sidebar collapsed={effectiveCollapsed} onToggleCollapsed={toggleCollapsed} />
 
       {mobileNavOpen ? (
         <>

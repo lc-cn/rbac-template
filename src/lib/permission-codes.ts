@@ -35,11 +35,6 @@ export const PermissionCodes = {
 
   SYSTEM_CONFIG_READ: 'system_config:read',
   SYSTEM_CONFIG_UPDATE: 'system_config:update',
-
-  OAUTH_PROVIDER_READ: 'oauth_provider:read',
-  OAUTH_PROVIDER_CREATE: 'oauth_provider:create',
-  OAUTH_PROVIDER_UPDATE: 'oauth_provider:update',
-  OAUTH_PROVIDER_DELETE: 'oauth_provider:delete',
 } as const
 
 export type PermissionCode = (typeof PermissionCodes)[keyof typeof PermissionCodes]

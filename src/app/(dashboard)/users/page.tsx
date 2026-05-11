@@ -27,7 +27,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useToast } from '@/hooks/use-toast'
 import { useI18n } from '@/i18n/context'
 import { PageShell, PageHeader, CardToolbar } from '@/components/layout/page-shell'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, Users } from 'lucide-react'
 
 interface Role {
   id: string
@@ -156,7 +156,7 @@ export default function UsersPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell mainVariant="wide">
       <PageHeader
         title={t('users.title')}
         description={t('users.subtitle')}
@@ -183,7 +183,7 @@ export default function UsersPage() {
           </CardToolbar>
         </CardHeader>
         <CardContent>
-          <div className="app-data-table overflow-x-auto">
+          <div className="app-data-table app-data-table--comfortable overflow-x-auto">
             <table className="w-full min-w-[40rem] text-sm">
               <thead>
                 <tr className="border-b border-border">
@@ -199,7 +199,23 @@ export default function UsersPage() {
                 {loading ? (
                   <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">{t('common.loading')}</td></tr>
                 ) : users.length === 0 ? (
-                  <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">{t('common.empty')}</td></tr>
+                  <tr>
+                    <td colSpan={6} className="p-0">
+                      <div className="flex flex-col items-center justify-center gap-4 px-6 py-14 text-center sm:py-16">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                          <Users className="h-5 w-5" aria-hidden />
+                        </div>
+                        <div className="max-w-sm space-y-2">
+                          <p className="text-base font-semibold text-foreground">{t('users.emptyTitle')}</p>
+                          <p className="text-sm leading-relaxed text-muted-foreground">{t('users.emptyDesc')}</p>
+                        </div>
+                        <Button type="button" onClick={openCreate} className="gap-2">
+                          <Plus className="h-4 w-4" />
+                          {t('users.emptyCta')}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
                 ) : users.map(user => (
                   <tr key={user.id} className="border-b border-border hover:bg-muted/50">
                     <td className="app-table-cell font-medium">{user.name}</td>

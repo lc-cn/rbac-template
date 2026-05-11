@@ -1,6 +1,6 @@
 # RBAC Template
 
-基于 **Next.js 16**（App Router）、**@libsql/client**（直连 SQL + 轻量数据层）、**Tailwind CSS v4** 与 **shadcn/ui** 的全栈 **RBAC**（基于角色的访问控制）后台模板。认证使用 **NextAuth.js / Auth.js v5**（`next-auth@5` beta：邮箱密码 + GitHub / Google + 可选 Generic OIDC）。
+基于 **Next.js 16**（App Router）、**@libsql/client**（直连 SQL + 轻量数据层）、**Tailwind CSS v4** 与 **shadcn/ui** 的全栈 **RBAC**（基于角色的访问控制）后台模板。认证使用 **NextAuth.js / Auth.js v5**（`next-auth@5` beta：**邮箱密码**登录）。
 
 ---
 
@@ -10,8 +10,8 @@
 - 角色管理（CRUD + 权限分配）
 - 权限管理（按应用 / 功能分组）
 - 应用与功能模块管理
-- 系统配置（通用 k/v + OAuth2 提供商表，与登录页联动）
-- 登录：邮箱密码；已启用且凭证非占位的 **GitHub / Google** 会出现在登录页
+- 系统配置（通用 k/v：站点名、会话超时等）
+- 登录：**仅邮箱密码**（控制台不再提供 OAuth / OIDC 联邦登录）
 
 ### 安全模型（摘要）
 
@@ -26,7 +26,7 @@
 | 框架 | Next.js 16 App Router、React 19 |
 | 数据库 | [Turso](https://turso.tech) / LibSQL，[`@libsql/client`](https://github.com/tursodatabase/libsql-client-ts) |
 | 数据访问 | `src/lib/data-access.ts`（手写 SQL）；NextAuth 适配器见 `src/lib/next-auth-libsql-adapter.ts` |
-| 认证 | Auth.js / NextAuth v5（JWT Session + 自定义 LibSQL Adapter；可选 `AUTH_OIDC_*` Generic OIDC） |
+| 认证 | Auth.js / NextAuth v5（JWT Session + 自定义 LibSQL Adapter；**Credentials** 邮箱密码） |
 | UI | Tailwind CSS v4、shadcn/ui、next-themes、站内 i18n（中/英） |
 
 ---
@@ -66,20 +66,13 @@ pnpm run seed
 pnpm dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。**登录 / OAuth** 建议在 `.env` 或 `.env.local` 中配置 `NEXTAUTH_URL`（如 `http://localhost:3000`）与 `NEXTAUTH_SECRET`（生产务必使用强随机值；未配置时开发环境有代码内回退，**勿用于公网**）。
+打开 [http://localhost:3000](http://localhost:3000)。请在 `.env` 或 `.env.local` 中配置 `NEXTAUTH_URL`（如 `http://localhost:3000`）与 `NEXTAUTH_SECRET`（生产务必使用强随机值；未配置时开发环境有代码内回退，**勿用于公网**）。
 
 | 默认管理员邮箱 | 默认密码 |
 |----------------|----------|
 | admin@example.com | admin123 |
 
 部署到公网后请**立即修改密码**或删除该账号。
-
-### OAuth2（与「系统配置」联动）
-
-NextAuth 在构建登录选项时会读取库中 **已启用** 且 **Client ID / Secret 非占位** 的 `OAuthProvider` 行：
-
-- **`type` 为 `github` / `google`**：登录页展示对应按钮；在 GitHub / Google 控制台配置回调：`{NEXTAUTH_URL}/api/auth/callback/github` 或 `.../callback/google`。
-- 其他类型（如微信）尚未接 Provider，仅保存在库中，不影响当前登录页。
 
 ---
 
@@ -264,8 +257,8 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 
 ### 与当前能力的关系
 
-- **对本站用户**：仍用 **NextAuth** 登录（邮箱密码 / GitHub / Google），会话为 **JWT**；访问 `/oauth/authorize` 时沿用该会话决定是否已登录。  
-- **对第三方站点**：已通过上一节 **自建 OAuth2/OIDC 端点** 对外签发 **授权码与 token**；NextAuth 仍可作为 **联邦登录**（去 GitHub/Google 拉账号），与「本系统当 IdP」并存。  
+- **对本站用户**：使用 **NextAuth** 的 **Credentials（邮箱密码）** 登录，会话为 **JWT**；访问 `/oauth/authorize` 时沿用该会话决定是否已登录。  
+- **对第三方站点**：通过 **自建 OAuth2/OIDC 端点** 对外签发 **授权码与 token**（本系统作 IdP）；与控制台登录方式解耦。  
 - **已覆盖**：同意页、Refresh、RS256/JWKS（可选）、吊销、自省、管理后台维护 Client、登出入口；未覆盖动态注册等见上文。
 
 ### 推荐技术路线（择一或组合）

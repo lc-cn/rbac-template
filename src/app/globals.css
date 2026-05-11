@@ -134,6 +134,11 @@
     @apply mx-auto flex w-full max-w-[min(100%,var(--layout-max-w))] flex-col gap-8 px-4 py-6 sm:gap-9 sm:px-6 sm:py-8 lg:gap-10 lg:px-10 lg:py-10;
   }
 
+  /** 表单 / 引导等定宽容器（Issue #7 版心策略） */
+  .app-page--narrow {
+    @apply max-w-3xl;
+  }
+
   .app-page--comfortable {
     @apply gap-6 sm:gap-8 lg:gap-9;
   }
@@ -292,5 +297,14 @@
 
   .app-data-table tbody tr:last-child td:last-child {
     border-bottom-right-radius: 1rem;
+  }
+
+  /** 列表舒适行高（用户表等） */
+  .app-data-table--comfortable .app-table-head {
+    @apply py-3.5 sm:py-4;
+  }
+
+  .app-data-table--comfortable tbody .app-table-cell {
+    @apply py-3.5 sm:py-4;
   }
 }

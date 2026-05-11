@@ -11,11 +11,15 @@ type Stat = {
 }
 
 export function DashboardView({
+  tenantName,
+  tenantSlug,
   userCount,
   roleCount,
   permissionCount,
   appCount,
 }: {
+  tenantName: string
+  tenantSlug: string
   userCount: number
   roleCount: number
   permissionCount: number
@@ -32,7 +36,21 @@ export function DashboardView({
 
   return (
     <PageShell density="comfortable">
-      <PageHeader title={t('dashboard.title')} description={t('dashboard.subtitle')} />
+      <PageHeader
+        title={t('dashboard.title')}
+        description={
+          tenantName ? (
+            <div className="space-y-1">
+              <p className="app-page-desc">{t('dashboard.subtitle')}</p>
+              <p className="text-sm font-medium text-foreground">
+                {t('dashboard.contextLine', { name: tenantName, slug: tenantSlug })}
+              </p>
+            </div>
+          ) : (
+            t('dashboard.subtitle')
+          )
+        }
+      />
 
       <div className="app-grid-stats">
         {stats.map((stat) => {

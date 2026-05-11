@@ -202,17 +202,6 @@ CREATE TABLE IF NOT EXISTS "SystemConfig" (
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS "OAuthProvider" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "name" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
-    "clientId" TEXT NOT NULL,
-    "clientSecret" TEXT NOT NULL,
-    "enabled" BOOLEAN NOT NULL DEFAULT false,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
 CREATE UNIQUE INDEX IF NOT EXISTS "Account_provider_providerAccountId_key" ON "Account"("provider", "providerAccountId");
 CREATE UNIQUE INDEX IF NOT EXISTS "Session_sessionToken_key" ON "Session"("sessionToken");
@@ -226,7 +215,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS "OAuth2Client_clientId_key" ON "OAuth2Client"(
 CREATE UNIQUE INDEX IF NOT EXISTS "Feature_applicationId_code_key" ON "Feature"("applicationId", "code");
 CREATE UNIQUE INDEX IF NOT EXISTS "Permission_featureId_code_key" ON "Permission"("featureId", "code");
 CREATE UNIQUE INDEX IF NOT EXISTS "SystemConfig_key_key" ON "SystemConfig"("key");
-CREATE UNIQUE INDEX IF NOT EXISTS "OAuthProvider_name_key" ON "OAuthProvider"("name");
 
 CREATE TABLE IF NOT EXISTS "OAuth2AuthorizationCode" (
     "id" TEXT NOT NULL PRIMARY KEY,

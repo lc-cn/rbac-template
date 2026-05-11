@@ -169,14 +169,3 @@ model SystemConfig {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
-model OAuthProvider {
-  id           String   @id @default(cuid())
-  name         String   @unique
-  type         String
-  clientId     String
-  clientSecret String
-  enabled      Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-}

@@ -50,11 +50,6 @@
 | `/api/applications/[id]/oauth` | DELETE | — | `oauth_client:write` | |
 | `/api/system-config` | GET | — | `system_config:read` | |
 | `/api/system-config` | PUT | — | `system_config:update` | |
-| `/api/oauth-providers` | GET | — | `oauth_provider:read` | |
-| `/api/oauth-providers` | POST | — | `oauth_provider:create` | |
-| `/api/oauth-providers/[id]` | GET | — | `oauth_provider:read` | 含 `clientSecret` |
-| `/api/oauth-providers/[id]` | PUT | — | `oauth_provider:update` | |
-| `/api/oauth-providers/[id]` | DELETE | — | `oauth_provider:delete` | |
 
 ### 未纳入本矩阵的租户相关路由（刻意）
 

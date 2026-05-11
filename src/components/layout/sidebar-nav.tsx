@@ -17,6 +17,8 @@ import {
   LayoutDashboard,
   CircleUser,
   Building2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 
 const navItems = [
@@ -35,9 +37,19 @@ type SidebarNavProps = {
   onLinkClick?: () => void
   showCloseButton?: boolean
   onClose?: () => void
+  /** 桌面侧栏收起：仅图标 + 缩短品牌区 */
+  collapsed?: boolean
+  /** 桌面端展开/收起（移动端不传） */
+  onToggleCollapse?: () => void
 }
 
-export function SidebarNav({ onLinkClick, showCloseButton, onClose }: SidebarNavProps) {
+export function SidebarNav({
+  onLinkClick,
+  showCloseButton,
+  onClose,
+  collapsed = false,
+  onToggleCollapse,
+}: SidebarNavProps) {
   const pathname = usePathname()
   const { t } = useI18n()
   const { data: session } = useSession()
@@ -54,7 +66,8 @@ export function SidebarNav({ onLinkClick, showCloseButton, onClose }: SidebarNav
       <div
         className={cn(
           'relative shrink-0 border-b border-border/40 px-3 pb-4 pt-3 sm:px-4 sm:pb-5 sm:pt-4',
-          showCloseButton && 'pr-14'
+          showCloseButton && 'pr-14',
+          collapsed && 'px-2 pb-3 pt-3 sm:px-2 sm:pb-4 sm:pt-3'
         )}
       >
         {showCloseButton && (
@@ -69,39 +82,75 @@ export function SidebarNav({ onLinkClick, showCloseButton, onClose }: SidebarNav
             <X className="h-5 w-5" />
           </Button>
         )}
-        <div className="rounded-2xl border border-border/60 bg-muted/60 px-4 py-4 shadow-sm">
-          <h1 className="text-lg font-bold leading-tight tracking-tight text-foreground sm:text-xl">{t('nav.brand')}</h1>
-          <p className="mt-1 text-xs leading-snug text-muted-foreground">{t('nav.tagline')}</p>
+        <div
+          className={cn(
+            'rounded-2xl border border-border/60 bg-muted/60 shadow-sm',
+            collapsed ? 'flex items-center justify-center px-0 py-3' : 'px-4 py-4'
+          )}
+          aria-label={collapsed ? t('nav.brand') : undefined}
+        >
+          {collapsed ? (
+            <LayoutDashboard className="h-6 w-6 shrink-0 text-foreground" aria-hidden />
+          ) : (
+            <>
+              <h1 className="text-lg font-bold leading-tight tracking-tight text-foreground sm:text-xl">{t('nav.brand')}</h1>
+              <p className="mt-1 text-xs leading-snug text-muted-foreground">{t('nav.tagline')}</p>
+            </>
+          )}
         </div>
       </div>
-      <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3 sm:px-3 sm:py-4">
+      <nav
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3 sm:px-3 sm:py-4',
+          collapsed && 'px-1.5 sm:px-1.5'
+        )}
+      >
         <ul className="space-y-1">
           {allNav.map((item) => {
             const Icon = item.icon
             const isActive =
               pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
+            const label = t(item.labelKey)
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
                   onClick={() => onLinkClick?.()}
+                  aria-label={label}
+                  title={collapsed ? label : undefined}
                   className={cn(
-                    'flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium transition-colors duration-200',
+                    'flex items-center rounded-xl border border-transparent text-sm font-medium transition-colors duration-200',
+                    collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
                     isActive
                       ? 'border-foreground/15 bg-muted font-medium text-foreground shadow-sm'
                       : 'text-muted-foreground hover:border-border/60 hover:bg-muted/70 hover:text-foreground'
                   )}
                 >
-                  <Icon className="h-4 w-4 shrink-0 opacity-90" />
-                  <span className="min-w-0 break-words">{t(item.labelKey)}</span>
+                  <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                  <span className={cn('min-w-0 break-words', collapsed && 'sr-only')}>{label}</span>
                 </Link>
               </li>
             )
           })}
         </ul>
       </nav>
-      <div className="shrink-0 border-t border-border/40 px-3 py-3">
-        <p className="text-center text-xs text-muted-foreground">{t('common.version')} 1.0.0</p>
+      <div className={cn('shrink-0 border-t border-border/40 px-2 py-2', collapsed && 'px-1')}>
+        {onToggleCollapse ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="mx-auto mb-1 flex h-9 w-9"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+            aria-pressed={collapsed}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
+        ) : null}
+        <p className={cn('text-center text-xs text-muted-foreground', collapsed && 'text-[0.65rem] leading-tight')}>
+          {collapsed ? 'v1' : `${t('common.version')} 1.0.0`}
+        </p>
       </div>
     </div>
   )

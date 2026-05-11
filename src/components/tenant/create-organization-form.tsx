@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useI18n } from '@/i18n/context'
 
 type TenantsApiResponse = {
   tenants?: { id: string; name: string; slug: string }[]
@@ -20,6 +21,7 @@ export function CreateOrganizationForm({
   /** 创建并切换租户后的跳转路径 */
   onSuccessNavigateTo?: string
 }) {
+  const { t } = useI18n()
   const router = useRouter()
   const { update } = useSession()
   const [policyLoading, setPolicyLoading] = useState(true)
@@ -38,11 +40,11 @@ export function CreateOrganizationForm({
       setAllowCreate(d.allowSelfServiceCreate === true)
     } catch {
       setAllowCreate(false)
-      setError('无法读取创建策略，请稍后重试')
+      setError(t('org.policyLoadError'))
     } finally {
       setPolicyLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     void loadPolicy()
@@ -53,7 +55,7 @@ export function CreateOrganizationForm({
     setError(null)
     const trimmed = name.trim()
     if (!trimmed) {
-      setError('请填写组织名称')
+      setError(t('org.nameRequired'))
       return
     }
     setSubmitting(true)
@@ -68,18 +70,18 @@ export function CreateOrganizationForm({
       })
       const data = (await r.json()) as { error?: string; tenant?: { id: string } }
       if (!r.ok) {
-        setError(data.error ?? '创建失败')
+        setError(data.error ?? t('org.createFail'))
         return
       }
       if (!data.tenant?.id) {
-        setError('创建失败：未返回租户信息')
+        setError(t('org.createMissingTenant'))
         return
       }
       await update({ currentTenantId: data.tenant.id })
       router.push(onSuccessNavigateTo)
       router.refresh()
     } catch {
-      setError('网络错误，请重试')
+      setError(t('org.networkError'))
     } finally {
       setSubmitting(false)
     }
@@ -88,20 +90,18 @@ export function CreateOrganizationForm({
   if (policyLoading) {
     return (
       <div className={className}>
-        <p className="text-muted-foreground text-sm">加载中…</p>
+        <p className="text-sm text-muted-foreground">{t('org.loadingPolicy')}</p>
       </div>
     )
   }
 
   if (!allowCreate) {
     return (
-      <div className={className}>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          当前部署未开放自助创建组织。请联系平台管理员为你开通租户，或请已在组织内的管理员邀请你加入。
-        </p>
-        <p className="text-muted-foreground mt-2 text-xs">
-          运维可将环境变量 <code className="rounded bg-muted px-1 py-0.5 font-mono">ALLOW_SELF_SERVICE_TENANT_CREATE</code>{' '}
-          设为开启（非 0/false/no/off）后，用户可自行创建组织。
+      <div className={className} role="region" aria-label={t('org.selfServiceOffTitle')}>
+        <p className="text-sm font-medium text-foreground">{t('org.selfServiceOffTitle')}</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{t('org.selfServiceOffBody')}</p>
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          {t('org.selfServiceOffHint')}
         </p>
       </div>
     )
@@ -111,12 +111,12 @@ export function CreateOrganizationForm({
     <form onSubmit={onSubmit} className={className}>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="org-name">组织名称</Label>
+          <Label htmlFor="org-name">{t('org.nameLabel')}</Label>
           <Input
             id="org-name"
             name="name"
             autoComplete="organization"
-            placeholder="例如：Acme 研发团队"
+            placeholder={t('org.namePlaceholder')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={120}
@@ -125,13 +125,13 @@ export function CreateOrganizationForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="org-slug">
-            标识 slug <span className="text-muted-foreground font-normal">（可选，留空则自动生成）</span>
+            {t('org.slugLabel')} <span className="font-normal text-muted-foreground">{t('org.slugOptional')}</span>
           </Label>
           <Input
             id="org-slug"
             name="slug"
             autoComplete="off"
-            placeholder="仅小写字母、数字与连字符"
+            placeholder={t('org.slugPlaceholder')}
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
             maxLength={63}
@@ -139,9 +139,13 @@ export function CreateOrganizationForm({
             className="font-mono text-sm"
           />
         </div>
-        {error ? <p className="text-destructive text-sm">{error}</p> : null}
+        {error ? (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        ) : null}
         <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
-          {submitting ? '创建中…' : '创建组织并成为负责人'}
+          {submitting ? t('org.submitting') : t('org.submit')}
         </Button>
       </div>
     </form>

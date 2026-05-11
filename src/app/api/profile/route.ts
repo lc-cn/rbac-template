@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import {
   deleteUserAccountGlobally,
   getUserByIdGlobal,
-  listLinkedAccountsByUserId,
   updateUserSelfProfile,
   verifySelfDeleteAccount,
 } from '@/lib/data-access'
@@ -17,7 +16,6 @@ export async function GET() {
     const user = await getUserByIdGlobal(userId)
     if (!user) return NextResponse.json({ error: '用户不存在' }, { status: 404 })
 
-    const accounts = await listLinkedAccountsByUserId(userId)
     const hasPassword = !!(user.password && user.password.trim())
 
     return NextResponse.json({
@@ -29,7 +27,6 @@ export async function GET() {
         avatar: user.avatar,
         hasPassword,
       },
-      accounts,
     })
   } catch (e) {
     console.error(e)

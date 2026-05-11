@@ -1,110 +1,42 @@
 import NextAuth from 'next-auth'
 import type { NextAuthConfig } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
-import GitHub from 'next-auth/providers/github'
-import Google from 'next-auth/providers/google'
-import { findUserByEmail, getUserTenantMembership, listEnabledOAuthProviders, resolveJwtTenantClaims } from '@/lib/data-access'
+import { findUserByEmail, getUserTenantMembership, resolveJwtTenantClaims } from '@/lib/data-access'
 import type { TenantRole } from '@/lib/data-access'
 import { verifyStoredPassword } from '@/lib/password'
 import { LibsqlAdapter } from '@/lib/next-auth-libsql-adapter'
 import { getAuthSecret } from '@/lib/auth-secret'
 
-function isPlaceholderOAuthSecret(clientId: string, clientSecret: string) {
-  const id = clientId.trim().toLowerCase()
-  const sec = clientSecret.trim().toLowerCase()
-  return (
-    !id ||
-    !sec ||
-    id.startsWith('your-') ||
-    sec.startsWith('your-') ||
-    id === 'placeholder' ||
-    sec === 'placeholder'
-  )
-}
+const providers: NextAuthConfig['providers'] = [
+  Credentials({
+    id: 'credentials',
+    name: 'credentials',
+    credentials: {
+      email: { label: 'Email', type: 'email' },
+      password: { label: 'Password', type: 'password' },
+    },
+    async authorize(credentials) {
+      const email = typeof credentials?.email === 'string' ? credentials.email.trim() : ''
+      const password = typeof credentials?.password === 'string' ? credentials.password : ''
+      if (!email || !password) return null
 
-function genericOidcProvider(): NextAuthConfig['providers'][number] | null {
-  const issuer = process.env.AUTH_OIDC_ISSUER?.trim().replace(/\/$/, '') ?? ''
-  const clientId = process.env.AUTH_OIDC_ID?.trim() ?? ''
-  const clientSecret = process.env.AUTH_OIDC_SECRET?.trim() ?? ''
-  if (!issuer || !clientId || !clientSecret) return null
-  return {
-    id: 'oidc',
-    name: process.env.AUTH_OIDC_NAME?.trim() || 'OIDC',
-    type: 'oidc',
-    issuer,
-    clientId,
-    clientSecret,
-    allowDangerousEmailAccountLinking: true,
-  }
-}
+      const user = await findUserByEmail(email)
+      if (!user?.password || !verifyStoredPassword(user.password, password)) return null
+      if (!user.status) return null
 
-async function buildProviders(): Promise<NextAuthConfig['providers']> {
-  const oauthRows = await listEnabledOAuthProviders()
-  const providers: NextAuthConfig['providers'] = [
-    Credentials({
-      id: 'credentials',
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
-      },
-      async authorize(credentials) {
-        const email = typeof credentials?.email === 'string' ? credentials.email.trim() : ''
-        const password = typeof credentials?.password === 'string' ? credentials.password : ''
-        if (!email || !password) return null
+      const profileImage = user.image ?? user.avatar ?? undefined
 
-        const user = await findUserByEmail(email)
-        if (!user?.password || !verifyStoredPassword(user.password, password)) return null
-        if (!user.status) return null
+      return {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        image: profileImage,
+      }
+    },
+  }),
+]
 
-        const profileImage = user.image ?? user.avatar ?? undefined
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          image: profileImage,
-        }
-      },
-    }),
-  ]
-
-  let githubAdded = false
-  let googleAdded = false
-
-  for (const row of oauthRows) {
-    const cid = row.clientId?.trim() ?? ''
-    const sec = row.clientSecret?.trim() ?? ''
-    if (isPlaceholderOAuthSecret(cid, sec)) continue
-
-    if (row.type === 'github' && !githubAdded) {
-      providers.push(
-        GitHub({
-          clientId: cid,
-          clientSecret: sec,
-          allowDangerousEmailAccountLinking: true,
-        })
-      )
-      githubAdded = true
-    } else if (row.type === 'google' && !googleAdded) {
-      providers.push(
-        Google({
-          clientId: cid,
-          clientSecret: sec,
-          allowDangerousEmailAccountLinking: true,
-        })
-      )
-      googleAdded = true
-    }
-  }
-
-  const oidc = genericOidcProvider()
-  if (oidc) providers.push(oidc)
-
-  return providers
-}
-
-export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: LibsqlAdapter(),
   trustHost: true,
   secret: getAuthSecret(),
@@ -115,7 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
   pages: {
     signIn: '/login',
   },
-  providers: await buildProviders(),
+  providers,
   callbacks: {
     async redirect({ url, baseUrl }) {
       if (url.startsWith('/')) return `${baseUrl}${url}`
@@ -183,4 +115,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
       return session
     },
   },
-}))
+})

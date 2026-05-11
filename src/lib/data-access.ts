@@ -968,29 +968,6 @@ export async function deleteUserAccountGlobally(userId: string) {
   await db.execute({ sql: `DELETE FROM "User" WHERE "id" = ?`, args: [userId] })
 }
 
-export async function listLinkedAccountsByUserId(userId: string) {
-  const db = getDb()
-  const r = await db.execute({
-    sql: `SELECT "id", "provider", "providerAccountId", "type" FROM "Account" WHERE "userId" = ? ORDER BY "provider" ASC`,
-    args: [userId],
-  })
-  return (r.rows as unknown as Record<string, unknown>[]).map((row) => ({
-    id: String(row.id),
-    provider: String(row.provider),
-    providerAccountId: String(row.providerAccountId),
-    type: String(row.type),
-  }))
-}
-
-export async function countLinkedAccountsByUserId(userId: string) {
-  const db = getDb()
-  const r = await db.execute({
-    sql: `SELECT COUNT(*) as c FROM "Account" WHERE "userId" = ?`,
-    args: [userId],
-  })
-  return Number((r.rows[0] as unknown as { c: number }).c)
-}
-
 function userHasPasswordSet(user: { password: string | null }) {
   return !!(user.password && user.password.trim())
 }
@@ -1039,30 +1016,6 @@ export async function changeUserPassword(
   return { ok: true as const }
 }
 
-export async function unlinkOAuthAccountForUser(
-  userId: string,
-  provider: string,
-  providerAccountId: string
-): Promise<{ ok: true } | { error: 'not_found' | 'last_login_method' | 'not_linked' }> {
-  const user = await getUserByIdGlobal(userId)
-  if (!user) return { error: 'not_found' }
-  const n = await countLinkedAccountsByUserId(userId)
-  const hasPw = userHasPasswordSet(user)
-  if (n === 1 && !hasPw) return { error: 'last_login_method' }
-
-  const db = getDb()
-  const check = await db.execute({
-    sql: `SELECT "id" FROM "Account" WHERE "userId" = ? AND "provider" = ? AND "providerAccountId" = ? LIMIT 1`,
-    args: [userId, provider, providerAccountId],
-  })
-  if (!check.rows[0]) return { error: 'not_linked' }
-  await db.execute({
-    sql: `DELETE FROM "Account" WHERE "userId" = ? AND "provider" = ? AND "providerAccountId" = ?`,
-    args: [userId, provider, providerAccountId],
-  })
-  return { ok: true }
-}
-
 export async function verifySelfDeleteAccount(
   userId: string,
   opts: { password?: string; confirmEmail?: string }
@@ -1078,94 +1031,6 @@ export async function verifySelfDeleteAccount(
   const got = opts.confirmEmail?.trim().toLowerCase() ?? ''
   if (!got || got !== expected) return { error: 'invalid' }
   return { ok: true }
-}
-
-export async function listOAuthProviders() {
-  const db = getDb()
-  const r = await db.execute({ sql: `SELECT * FROM "OAuthProvider" ORDER BY "createdAt" DESC`, args: [] })
-  return (r.rows as unknown as Record<string, unknown>[]).map((row) => ({
-    id: String(row.id),
-    name: String(row.name),
-    type: String(row.type),
-    clientId: String(row.clientId),
-    clientSecret: String(row.clientSecret),
-    enabled: boolFromSql(row.enabled),
-    createdAt: String(row.createdAt),
-    updatedAt: String(row.updatedAt),
-  }))
-}
-
-/** 登录配置用：仅启用，按 updatedAt 降序（与原先 Prisma orderBy 一致） */
-export async function listEnabledOAuthProviders() {
-  const db = getDb()
-  const r = await db.execute({
-    sql: `SELECT * FROM "OAuthProvider" WHERE "enabled" = 1 ORDER BY "updatedAt" DESC`,
-    args: [],
-  })
-  return (r.rows as unknown as Record<string, unknown>[]).map((row) => ({
-    id: String(row.id),
-    name: String(row.name),
-    type: String(row.type),
-    clientId: String(row.clientId),
-    clientSecret: String(row.clientSecret),
-    enabled: boolFromSql(row.enabled),
-    createdAt: String(row.createdAt),
-    updatedAt: String(row.updatedAt),
-  }))
-}
-
-export async function getOAuthProviderById(id: string) {
-  const db = getDb()
-  const r = await db.execute({ sql: `SELECT * FROM "OAuthProvider" WHERE "id" = ?`, args: [id] })
-  const row = r.rows[0] as unknown as Record<string, unknown> | undefined
-  if (!row) return null
-  return {
-    id: String(row.id),
-    name: String(row.name),
-    type: String(row.type),
-    clientId: String(row.clientId),
-    clientSecret: String(row.clientSecret),
-    enabled: boolFromSql(row.enabled),
-    createdAt: String(row.createdAt),
-    updatedAt: String(row.updatedAt),
-  }
-}
-
-export async function createOAuthProvider(input: {
-  name: string
-  type: string
-  clientId: string
-  clientSecret: string
-  enabled?: boolean
-}) {
-  const db = getDb()
-  const id = newId()
-  const t = nowIso()
-  const en = input.enabled ? 1 : 0
-  await db.execute({
-    sql: `INSERT INTO "OAuthProvider" ("id","name","type","clientId","clientSecret","enabled","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?)`,
-    args: [id, input.name, input.type, input.clientId, input.clientSecret, en, t, t],
-  })
-  return getOAuthProviderById(id)
-}
-
-export async function updateOAuthProvider(
-  id: string,
-  data: { name: string; type: string; clientId: string; clientSecret: string; enabled: boolean }
-) {
-  const db = getDb()
-  const t = nowIso()
-  const en = data.enabled ? 1 : 0
-  await db.execute({
-    sql: `UPDATE "OAuthProvider" SET "name"=?, "type"=?, "clientId"=?, "clientSecret"=?, "enabled"=?, "updatedAt"=? WHERE "id"=?`,
-    args: [data.name, data.type, data.clientId, data.clientSecret, en, t, id],
-  })
-  return getOAuthProviderById(id)
-}
-
-export async function deleteOAuthProvider(id: string) {
-  const db = getDb()
-  await db.execute({ sql: `DELETE FROM "OAuthProvider" WHERE "id" = ?`, args: [id] })
 }
 
 export async function listSystemConfigs() {
@@ -1253,6 +1118,18 @@ export async function dashboardCounts(tenantId: string) {
     permissionCount: Number((pe.rows[0] as unknown as { c: number }).c),
     appCount: Number((ap.rows[0] as unknown as { c: number }).c),
   }
+}
+
+/** 控制台首页等展示的租户名称与 slug */
+export async function getTenantDisplay(tenantId: string): Promise<{ name: string; slug: string } | null> {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT "name", "slug" FROM "Tenant" WHERE "id" = ?`,
+    args: [tenantId],
+  })
+  const row = r.rows[0] as unknown as { name: string; slug: string } | undefined
+  if (!row) return null
+  return { name: String(row.name), slug: String(row.slug) }
 }
 
 /** Issue #6：暂停 / 归档（运维或 owner 通过 API 切换）。 */

@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
-import { getProviders, signIn, signOut, useSession } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 import { PageShell, PageHeader } from '@/components/layout/page-shell'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,8 +20,6 @@ import {
 import { useToast } from '@/hooks/use-toast'
 import { useI18n } from '@/i18n/context'
 
-type LinkedAccount = { id: string; provider: string; providerAccountId: string; type: string }
-
 type ProfileUser = {
   id: string
   name: string
@@ -39,8 +36,6 @@ export default function ProfilePage() {
 
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<ProfileUser | null>(null)
-  const [accounts, setAccounts] = useState<LinkedAccount[]>([])
-  const [providerKeys, setProviderKeys] = useState<string[]>([])
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -61,19 +56,17 @@ export default function ProfilePage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [res, p] = await Promise.all([fetch('/api/profile'), getProviders()])
+      const res = await fetch('/api/profile')
       const data = await res.json()
       if (!res.ok) {
         toast({ title: t('common.error'), description: data.error ?? t('profile.loadFail'), variant: 'destructive' })
         return
       }
       setUser(data.user)
-      setAccounts(data.accounts ?? [])
       setName(data.user.name)
       setEmail(data.user.email)
       setImage(data.user.image ?? '')
       setAvatar(data.user.avatar ?? '')
-      setProviderKeys(p ? Object.keys(p) : [])
     } catch {
       toast({ title: t('common.error'), description: t('profile.loadFail'), variant: 'destructive' })
     } finally {
@@ -155,28 +148,6 @@ export default function ProfilePage() {
     }
   }
 
-  async function onUnlink(a: LinkedAccount) {
-    const res = await fetch('/api/profile/accounts', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: a.provider, providerAccountId: a.providerAccountId }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      toast({ title: t('common.error'), description: data.error ?? t('profile.unlinkFail'), variant: 'destructive' })
-      return
-    }
-    await load()
-    toast({ title: t('common.success'), description: t('profile.unlinked') })
-  }
-
-  function providerLabel(p: string) {
-    if (p === 'github') return t('profile.providerGithub')
-    if (p === 'google') return t('profile.providerGoogle')
-    if (p === 'oidc') return t('profile.providerOidc')
-    return p
-  }
-
   async function onDeleteAccount() {
     setDeleting(true)
     try {
@@ -198,13 +169,6 @@ export default function ProfilePage() {
       setDeleting(false)
     }
   }
-
-  const hasGithub = providerKeys.includes('github')
-  const hasGoogle = providerKeys.includes('google')
-  const hasOidc = providerKeys.includes('oidc')
-  const linkedGithub = accounts.some((a) => a.provider === 'github')
-  const linkedGoogle = accounts.some((a) => a.provider === 'google')
-  const linkedOidc = accounts.some((a) => a.provider === 'oidc')
 
   return (
     <PageShell>
@@ -293,57 +257,6 @@ export default function ProfilePage() {
                   {savingPw ? t('common.loading') : t('profile.changePassword')}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('profile.sectionLinked')}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">{t('profile.bindHint')}</p>
-              <div className="flex flex-wrap gap-2">
-                {hasGithub && !linkedGithub ? (
-                  <Button type="button" variant="outline" onClick={() => signIn('github', { callbackUrl: '/profile' })}>
-                    {t('profile.bindGithub')}
-                  </Button>
-                ) : null}
-                {hasGoogle && !linkedGoogle ? (
-                  <Button type="button" variant="outline" onClick={() => signIn('google', { callbackUrl: '/profile' })}>
-                    {t('profile.bindGoogle')}
-                  </Button>
-                ) : null}
-                {hasOidc && !linkedOidc ? (
-                  <Button type="button" variant="outline" onClick={() => signIn('oidc', { callbackUrl: '/profile' })}>
-                    {t('profile.bindOidc')}
-                  </Button>
-                ) : null}
-                {!hasGithub && !hasGoogle && !hasOidc ? (
-                  <p className="text-sm text-muted-foreground">
-                    {t('profile.noOauthConfigured')}{' '}
-                    <Link href="/system-config" className="text-primary underline-offset-4 hover:underline">
-                      {t('profile.goSystemConfig')}
-                    </Link>
-                  </p>
-                ) : null}
-              </div>
-              {accounts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t('profile.linkedEmpty')}</p>
-              ) : (
-                <ul className="divide-y divide-border rounded-xl border border-border/60">
-                  {accounts.map((a) => (
-                    <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 text-sm">
-                      <span>
-                        <span className="font-medium">{providerLabel(a.provider)}</span>
-                        <span className="ml-2 text-muted-foreground tabular-nums">{a.providerAccountId}</span>
-                      </span>
-                      <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => onUnlink(a)}>
-                        {t('profile.unlink')}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </CardContent>
           </Card>
 

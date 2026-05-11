@@ -1,29 +1,58 @@
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 
+export type PageMainVariant = 'wide' | 'narrow'
+
 /**
- * 应用内页统一容器：最大宽度、页边距、区块纵向节奏（与 globals.css `.app-page` 配套）。
+ * 主内容版心：`wide` 列表/表格全宽策略；`narrow` 表单与引导定宽居中（globals `.app-page--narrow`）。
  */
-export function PageShell({
+export function PageMain({
   children,
   className,
+  variant = 'wide',
   density = 'default',
 }: {
   children: ReactNode
   className?: string
-  /** comfortable：区块间距略紧，适合信息密度高的页 */
+  variant?: PageMainVariant
   density?: 'default' | 'comfortable'
 }) {
   return (
     <div
+      data-page-main={variant}
       className={cn(
         'app-page',
+        variant === 'narrow' && 'app-page--narrow',
         density === 'comfortable' && 'app-page--comfortable',
         className
       )}
     >
       {children}
     </div>
+  )
+}
+
+/**
+ * 应用内页统一容器：最大宽度、页边距、区块纵向节奏（与 globals.css `.app-page` 配套）。
+ * 等价于 `<PageMain variant={mainVariant} …>`。
+ */
+export function PageShell({
+  children,
+  className,
+  density = 'default',
+  mainVariant = 'wide',
+}: {
+  children: ReactNode
+  className?: string
+  /** comfortable：区块间距略紧，适合信息密度高的页 */
+  density?: 'default' | 'comfortable'
+  /** 版心宽窄（默认全站列表类 wide） */
+  mainVariant?: PageMainVariant
+}) {
+  return (
+    <PageMain variant={mainVariant} density={density} className={className}>
+      {children}
+    </PageMain>
   )
 }
 

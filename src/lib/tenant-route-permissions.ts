@@ -43,12 +43,6 @@ export const TENANT_ROUTE_PERMISSION_AUDIT = [
   { method: 'GET', route: '/api/system-config', permission: P.SYSTEM_CONFIG_READ, governance: '—' },
   { method: 'PUT', route: '/api/system-config', permission: P.SYSTEM_CONFIG_UPDATE, governance: '—' },
 
-  { method: 'GET', route: '/api/oauth-providers', permission: P.OAUTH_PROVIDER_READ, governance: '—' },
-  { method: 'POST', route: '/api/oauth-providers', permission: P.OAUTH_PROVIDER_CREATE, governance: '—' },
-  { method: 'GET', route: '/api/oauth-providers/[id]', permission: P.OAUTH_PROVIDER_READ, governance: '—', notes: '含 clientSecret' },
-  { method: 'PUT', route: '/api/oauth-providers/[id]', permission: P.OAUTH_PROVIDER_UPDATE, governance: '—' },
-  { method: 'DELETE', route: '/api/oauth-providers/[id]', permission: P.OAUTH_PROVIDER_DELETE, governance: '—' },
-
   { method: 'GET', route: '/api/tenants/[tenantId]/invitations', permission: P.USER_READ, governance: '—' },
   { method: 'POST', route: '/api/tenants/[tenantId]/invitations', permission: P.USER_CREATE, governance: 'owner|admin' },
   { method: 'PATCH', route: '/api/tenants/[tenantId]/lifecycle', permission: '—', governance: 'owner only' },

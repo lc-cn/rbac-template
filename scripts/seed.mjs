@@ -136,23 +136,6 @@ async function upsertUserRole(userId, roleId) {
   })
 }
 
-async function upsertOAuth(name, type, cid, sec, enabled) {
-  const r = await db.execute({ sql: `SELECT * FROM "OAuthProvider" WHERE "name" = ?`, args: [name] })
-  const t = now()
-  if (r.rows[0]) {
-    await db.execute({
-      sql: `UPDATE "OAuthProvider" SET "type"=?, "clientId"=?, "clientSecret"=?, "enabled"=?, "updatedAt"=? WHERE "name"=?`,
-      args: [type, cid, sec, enabled ? 1 : 0, t, name],
-    })
-    return
-  }
-  const id = randomUUID()
-  await db.execute({
-    sql: `INSERT INTO "OAuthProvider" ("id","name","type","clientId","clientSecret","enabled","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?)`,
-    args: [id, name, type, cid, sec, enabled ? 1 : 0, t, t],
-  })
-}
-
 async function upsertSystemConfig(key, value, group, label) {
   const r = await db.execute({ sql: `SELECT "id" FROM "SystemConfig" WHERE "key" = ?`, args: [key] })
   const t = now()
@@ -185,7 +168,6 @@ async function main() {
   const featureModuleFeature = await upsertFeature(appId, 'feature-module-mgmt', '功能模块', '应用下的功能模块')
   const oauthClientFeature = await upsertFeature(appId, 'oauth-client-mgmt', 'OAuth 客户端', 'OIDC/OAuth2 客户端与密钥')
   const systemConfigFeature = await upsertFeature(appId, 'system-config-mgmt', '系统配置', '站点与通用配置')
-  const oauthProviderFeature = await upsertFeature(appId, 'oauth-provider-mgmt', 'OAuth 提供商', '登录页 OAuth 提供商')
 
   const permissionsData = [
     ['user:read', '查看用户', userFeature.id],
@@ -212,10 +194,6 @@ async function main() {
     ['oauth_client:write', '管理 OAuth 客户端', oauthClientFeature.id],
     ['system_config:read', '查看系统配置', systemConfigFeature.id],
     ['system_config:update', '更新系统配置', systemConfigFeature.id],
-    ['oauth_provider:read', '查看 OAuth 提供商', oauthProviderFeature.id],
-    ['oauth_provider:create', '创建 OAuth 提供商', oauthProviderFeature.id],
-    ['oauth_provider:update', '更新 OAuth 提供商', oauthProviderFeature.id],
-    ['oauth_provider:delete', '删除 OAuth 提供商', oauthProviderFeature.id],
   ]
 
   const createdPerms = []
@@ -234,9 +212,6 @@ async function main() {
   })
   await upsertUserTenantOwner(String(adminUser.id), DEFAULT_TENANT_ID)
   await upsertUserRole(String(adminUser.id), String(adminRole.id))
-
-  await upsertOAuth('GitHub', 'github', 'your-github-client-id', 'your-github-client-secret', false)
-  await upsertOAuth('微信', 'wechat', 'your-wechat-app-id', 'your-wechat-app-secret', false)
 
   await upsertSystemConfig('site_name', 'RBAC 管理系统', 'general', '站点名称')
   await upsertSystemConfig('site_url', 'http://localhost:3000', 'general', '站点URL')
