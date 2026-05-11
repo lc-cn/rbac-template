@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
 import { createRole, isUniqueConstraintError, listRoles } from '@/lib/data-access'
+import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
-    const roles = await listRoles(search)
+    const roles = await listRoles(tenantRes, search)
     return NextResponse.json(roles)
   } catch (error) {
     console.error(error)
@@ -15,9 +20,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const body = await request.json()
     const { name, description, permissionIds } = body
-    const role = await createRole({ name, description, permissionIds })
+    const role = await createRole({
+      tenantId: tenantRes,
+      name,
+      description,
+      permissionIds,
+    })
     return NextResponse.json(role, { status: 201 })
   } catch (error: unknown) {
     console.error(error)

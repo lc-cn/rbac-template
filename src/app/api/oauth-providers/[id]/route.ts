@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
 import { deleteOAuthProvider, getOAuthProviderById, isUniqueConstraintError, updateOAuthProvider } from '@/lib/data-access'
+import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
+    void tenantRes
     const { id } = await params
     const provider = await getOAuthProviderById(id)
     if (!provider) return NextResponse.json({ error: '提供商不存在' }, { status: 404 })
@@ -14,6 +20,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
+    void tenantRes
     const { id } = await params
     const body = await request.json()
     const { name, type, clientId, clientSecret, enabled } = body
@@ -29,6 +39,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
+    void tenantRes
     const { id } = await params
     await deleteOAuthProvider(id)
     return NextResponse.json({ message: '删除成功' })

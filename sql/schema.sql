@@ -9,9 +9,37 @@ CREATE TABLE IF NOT EXISTS "User" (
     "password" TEXT,
     "avatar" TEXT,
     "status" BOOLEAN NOT NULL DEFAULT true,
+    "isPlatformAdmin" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS "Tenant" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Tenant_slug_key" ON "Tenant"("slug");
+
+CREATE TABLE IF NOT EXISTS "UserTenant" (
+    "userId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "tenantRole" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY ("userId", "tenantId"),
+    CONSTRAINT "UserTenant_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "UserTenant_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "UserTenant_one_owner_per_tenant" ON "UserTenant"("tenantId") WHERE "tenantRole" = 'owner';
+
+CREATE INDEX IF NOT EXISTS "UserTenant_tenantId_idx" ON "UserTenant"("tenantId");
+
+INSERT OR IGNORE INTO "Tenant" ("id", "name", "slug", "createdAt", "updatedAt")
+VALUES ('tenant_default', '默认组织', 'default', datetime('now'), datetime('now'));
 
 CREATE TABLE IF NOT EXISTS "Account" (
     "id" TEXT NOT NULL PRIMARY KEY,
@@ -47,8 +75,10 @@ CREATE TABLE IF NOT EXISTS "Role" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "name" TEXT NOT NULL,
     "description" TEXT,
+    "tenantId" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Role_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS "UserRole" (
@@ -66,8 +96,10 @@ CREATE TABLE IF NOT EXISTS "Application" (
     "code" TEXT NOT NULL,
     "description" TEXT,
     "status" BOOLEAN NOT NULL DEFAULT true,
+    "tenantId" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "Application_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 -- IdP OAuth2/OIDC 客户端：一条应用最多一条（applicationId UNIQUE），展示名用 Application.name
@@ -150,13 +182,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Account_provider_providerAccountId_key" ON "A
 CREATE UNIQUE INDEX IF NOT EXISTS "Session_sessionToken_key" ON "Session"("sessionToken");
 CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_token_key" ON "VerificationToken"("token");
 CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_identifier_token_key" ON "VerificationToken"("identifier", "token");
-CREATE UNIQUE INDEX IF NOT EXISTS "Role_name_key" ON "Role"("name");
-CREATE UNIQUE INDEX IF NOT EXISTS "Application_name_key" ON "Application"("name");
-CREATE UNIQUE INDEX IF NOT EXISTS "Application_code_key" ON "Application"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "Role_tenantId_name_key" ON "Role"("tenantId", "name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Application_tenantId_name_key" ON "Application"("tenantId", "name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Application_tenantId_code_key" ON "Application"("tenantId", "code");
 CREATE UNIQUE INDEX IF NOT EXISTS "OAuth2Client_applicationId_key" ON "OAuth2Client"("applicationId");
 CREATE UNIQUE INDEX IF NOT EXISTS "OAuth2Client_clientId_key" ON "OAuth2Client"("clientId");
 CREATE UNIQUE INDEX IF NOT EXISTS "Feature_applicationId_code_key" ON "Feature"("applicationId", "code");
-CREATE UNIQUE INDEX IF NOT EXISTS "Permission_code_key" ON "Permission"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "Permission_featureId_code_key" ON "Permission"("featureId", "code");
 CREATE UNIQUE INDEX IF NOT EXISTS "SystemConfig_key_key" ON "SystemConfig"("key");
 CREATE UNIQUE INDEX IF NOT EXISTS "OAuthProvider_name_key" ON "OAuthProvider"("name");
 

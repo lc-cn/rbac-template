@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  deleteUser,
-  getUserById,
+  deleteUserAccountGlobally,
+  getUserByIdGlobal,
   listLinkedAccountsByUserId,
   updateUserSelfProfile,
   verifySelfDeleteAccount,
@@ -14,7 +14,7 @@ export async function GET() {
     const userId = session?.user?.id
     if (!userId) return NextResponse.json({ error: '未登录' }, { status: 401 })
 
-    const user = await getUserById(userId)
+    const user = await getUserByIdGlobal(userId)
     if (!user) return NextResponse.json({ error: '用户不存在' }, { status: 404 })
 
     const accounts = await listLinkedAccountsByUserId(userId)
@@ -67,7 +67,7 @@ export async function PATCH(request: NextRequest) {
     if (r.error === 'not_found') return NextResponse.json({ error: '用户不存在' }, { status: 404 })
     if (r.error === 'email_taken') return NextResponse.json({ error: '邮箱已被占用' }, { status: 400 })
 
-    const user = await getUserById(userId)
+    const user = await getUserByIdGlobal(userId)
     if (!user) return NextResponse.json({ error: '用户不存在' }, { status: 404 })
 
     const profileImage = user.image ?? user.avatar ?? null
@@ -110,7 +110,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: '验证失败，请检查密码或确认邮箱' }, { status: 400 })
     }
 
-    await deleteUser(userId)
+    await deleteUserAccountGlobally(userId)
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error(e)

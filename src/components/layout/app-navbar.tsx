@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { Menu, Moon, Sun, Monitor, User, LogOut, CircleUser } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Menu, Moon, Sun, Monitor, User, LogOut, CircleUser, Building2, Check } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useSession, signOut } from 'next-auth/react'
 import { useEffect, useState } from 'react'
@@ -24,14 +25,45 @@ type AppNavbarProps = {
 }
 
 export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
   const { locale, setLocale, t } = useI18n()
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
   const [mounted, setMounted] = useState(false)
+  const [tenants, setTenants] = useState<{ id: string; name: string; slug: string }[]>([])
+  const [allowSelfServiceCreate, setAllowSelfServiceCreate] = useState(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    let cancelled = false
+    fetch('/api/tenants')
+      .then((r) => r.json())
+      .then((d: { tenants?: { id: string; name: string; slug: string }[]; allowSelfServiceCreate?: boolean }) => {
+        if (!cancelled) {
+          if (Array.isArray(d.tenants)) setTenants(d.tenants)
+          setAllowSelfServiceCreate(d.allowSelfServiceCreate === true)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [status])
+
+  const currentTenant = tenants.find((x) => x.id === session?.currentTenantId)
+  const tenantLabel = currentTenant?.name ?? session?.currentTenantId ?? '—'
+
+  async function switchTenant(tenantId: string) {
+    await update({ currentTenantId: tenantId })
+    router.refresh()
+  }
+
+  const showTenantMenu =
+    status === 'authenticated' && session?.user && (tenants.length > 0 || allowSelfServiceCreate)
 
   return (
     <header className="flex h-12 w-full shrink-0 items-center gap-2 border-b border-border/40 bg-card/95 px-2 shadow-[0_1px_0_rgb(15_23_42/0.04)] backdrop-blur-md sm:gap-3 sm:px-4">
@@ -51,6 +83,59 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
           <div className="h-8 w-28 shrink-0 sm:w-32" aria-hidden />
         ) : (
           <>
+            {showTenantMenu ? (
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 max-w-[11rem] shrink gap-1.5 px-2 font-normal sm:max-w-[14rem]"
+                      aria-label={t('nav.tenantSwitcher')}
+                    >
+                      <Building2 className="h-3.5 w-3.5 shrink-0 opacity-80" />
+                      <span className="truncate text-xs sm:text-sm">
+                        {tenants.length === 0 ? t('nav.createOrganizationShort') : tenantLabel}
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>{t('nav.tenantSwitcher')}</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {tenants.map((ten) => (
+                      <DropdownMenuItem
+                        key={ten.id}
+                        className="cursor-pointer gap-2"
+                        onSelect={() => {
+                          void switchTenant(ten.id)
+                        }}
+                      >
+                        {session?.currentTenantId === ten.id ? (
+                          <Check className="h-4 w-4 shrink-0 opacity-70" />
+                        ) : (
+                          <span className="inline-block w-4 shrink-0" aria-hidden />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{ten.name}</span>
+                        <span className="text-muted-foreground shrink-0 font-mono text-[10px]">{ten.slug}</span>
+                      </DropdownMenuItem>
+                    ))}
+                    {allowSelfServiceCreate ? (
+                      <>
+                        {tenants.length > 0 ? <DropdownMenuSeparator /> : null}
+                        <DropdownMenuItem asChild className="cursor-pointer">
+                          <Link href="/organizations/new" className="flex w-full items-center">
+                            {t('nav.createOrganization')}
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <div className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+              </>
+            ) : null}
+
             <div className="flex items-center rounded-lg border border-border/50 bg-muted/50 p-0.5 shadow-inner">
               <Button
                 type="button"

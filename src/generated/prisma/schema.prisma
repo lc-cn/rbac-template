@@ -1,6 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // 生成到源码树，避免 Vercel + pnpm 下 @prisma/client 类型重导出链解析不到 PrismaClient
   output   = "../src/generated/prisma"
 }
 
@@ -8,20 +7,44 @@ datasource db {
   provider = "sqlite"
 }
 
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  members   UserTenant[]
+  apps      Application[]
+  roles     Role[]
+}
+
+model UserTenant {
+  userId     String
+  tenantId   String
+  tenantRole String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tenantId])
+}
+
 model User {
-  id            String     @id @default(cuid())
-  name          String
-  email         String     @unique
-  emailVerified DateTime?
-  image         String?
-  password      String?
-  avatar        String?
-  status        Boolean    @default(true)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  roles         UserRole[]
-  accounts      Account[]
-  sessions      Session[]
+  id               String      @id @default(cuid())
+  name             String
+  email            String      @unique
+  emailVerified    DateTime?
+  image            String?
+  password         String?
+  avatar           String?
+  status           Boolean     @default(true)
+  isPlatformAdmin  Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  roles            UserRole[]
+  accounts         Account[]
+  sessions         Session[]
+  tenantMemberships UserTenant[]
 }
 
 model Account {
@@ -61,12 +84,16 @@ model VerificationToken {
 
 model Role {
   id          String           @id @default(cuid())
-  name        String           @unique
+  name        String
   description String?
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   users       UserRole[]
   permissions RolePermission[]
+
+  @@unique([tenantId, name])
 }
 
 model UserRole {
@@ -81,13 +108,18 @@ model UserRole {
 
 model Application {
   id          String    @id @default(cuid())
-  name        String    @unique
-  code        String    @unique
+  name        String
+  code        String
   description String?
   status      Boolean   @default(true)
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   features    Feature[]
+
+  @@unique([tenantId, name])
+  @@unique([tenantId, code])
 }
 
 model Feature {
@@ -107,13 +139,15 @@ model Feature {
 model Permission {
   id          String           @id @default(cuid())
   name        String
-  code        String           @unique
+  code        String
   description String?
   featureId   String
   feature     Feature          @relation(fields: [featureId], references: [id], onDelete: Cascade)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   roles       RolePermission[]
+
+  @@unique([featureId, code])
 }
 
 model RolePermission {

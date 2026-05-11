@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
 import {
   deleteOAuth2ClientAdmin,
   enableOAuthForApplication,
@@ -6,11 +7,15 @@ import {
   updateOAuth2ClientAdmin,
 } from '@/lib/oauth2/client-admin'
 import { getApplicationById } from '@/lib/data-access'
+import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const { id } = await params
-    const app = await getApplicationById(id)
+    const app = await getApplicationById(id, tenantRes)
     if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
     const dto = await getOAuth2ClientAdminById(id)
     if (!dto) {
@@ -30,7 +35,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const { id } = await params
+    const app = await getApplicationById(id, tenantRes)
+    if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
     const body = await request.json()
     const {
       name,
@@ -89,7 +99,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const { id } = await params
+    const app = await getApplicationById(id, tenantRes)
+    if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
     const body = await request.json()
     const {
       name,
@@ -140,7 +155,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const { id } = await params
+    const app = await getApplicationById(id, tenantRes)
+    if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
     const ok = await deleteOAuth2ClientAdmin(id)
     if (!ok) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
     return NextResponse.json({ ok: true })

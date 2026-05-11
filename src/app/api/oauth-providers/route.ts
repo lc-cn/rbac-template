@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
 import { createOAuthProvider, isUniqueConstraintError, listOAuthProviders } from '@/lib/data-access'
+import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET() {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
+    void tenantRes
     const providers = await listOAuthProviders()
     return NextResponse.json(providers)
   } catch (error) {
@@ -12,6 +18,10 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
+    void tenantRes
     const body = await request.json()
     const { name, type, clientId, clientSecret, enabled } = body
     const provider = await createOAuthProvider({

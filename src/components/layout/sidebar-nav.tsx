@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/i18n/context'
@@ -15,6 +16,7 @@ import {
   Settings,
   LayoutDashboard,
   CircleUser,
+  Building2,
 } from 'lucide-react'
 
 const navItems = [
@@ -38,6 +40,14 @@ type SidebarNavProps = {
 export function SidebarNav({ onLinkClick, showCloseButton, onClose }: SidebarNavProps) {
   const pathname = usePathname()
   const { t } = useI18n()
+  const { data: session } = useSession()
+
+  const platformItem =
+    session?.isPlatformAdmin === true
+      ? [{ href: '/platform', labelKey: 'nav.platform', icon: Building2 } as const]
+      : []
+
+  const allNav = [...navItems, ...platformItem]
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col">
@@ -66,7 +76,7 @@ export function SidebarNav({ onLinkClick, showCloseButton, onClose }: SidebarNav
       </div>
       <nav className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-3 sm:px-3 sm:py-4">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {allNav.map((item) => {
             const Icon = item.icon
             const isActive =
               pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))

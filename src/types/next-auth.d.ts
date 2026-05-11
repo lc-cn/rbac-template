@@ -1,4 +1,4 @@
-import 'next-auth'
+import type { TenantRole } from '@/lib/data-access'
 
 declare module 'next-auth' {
   interface Session {
@@ -8,6 +8,9 @@ declare module 'next-auth' {
       email?: string | null
       image?: string | null
     }
+    currentTenantId?: string | null
+    isPlatformAdmin?: boolean
+    tenantRole?: TenantRole | null
   }
 }
 
@@ -17,5 +20,8 @@ declare module 'next-auth/jwt' {
     name?: string | null
     email?: string | null
     picture?: string | null
+    currentTenantId?: string | null
+    isPlatformAdmin?: boolean
+    tenantRole?: TenantRole | null
   }
 }

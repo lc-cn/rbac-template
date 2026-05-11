@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
 import { createUser, isUniqueConstraintError, listUsers } from '@/lib/data-access'
+import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
-    const users = await listUsers(search)
+    const users = await listUsers(tenantRes, search)
     return NextResponse.json(users)
   } catch (error) {
     console.error(error)
@@ -15,9 +20,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    const tenantRes = requireTenantId(session)
+    if (tenantRes instanceof NextResponse) return tenantRes
     const body = await request.json()
     const { name, email, password, avatar, status, roleIds } = body
-    const user = await createUser({ name, email, password, avatar, status, roleIds })
+    const user = await createUser({
+      tenantId: tenantRes,
+      name,
+      email,
+      password,
+      avatar,
+      status,
+      roleIds,
+    })
     return NextResponse.json(user, { status: 201 })
   } catch (error: unknown) {
     console.error(error)

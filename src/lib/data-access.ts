@@ -13,6 +13,7 @@ function mapApp(row: Record<string, unknown>) {
     id: String(row.id),
     name: String(row.name),
     code: String(row.code),
+    tenantId: String(row.tenantId ?? ''),
     description: row.description == null ? null : String(row.description),
     status: boolFromSql(row.status),
     createdAt: String(row.createdAt),
@@ -51,6 +52,7 @@ function mapRole(row: Record<string, unknown>) {
   return {
     id: String(row.id),
     name: String(row.name),
+    tenantId: String(row.tenantId ?? ''),
     description: row.description == null ? null : String(row.description),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
@@ -67,6 +69,126 @@ function mapUserRow(row: Record<string, unknown>) {
     password: row.password == null ? null : String(row.password),
     avatar: row.avatar == null ? null : String(row.avatar),
     status: boolFromSql(row.status),
+    isPlatformAdmin: boolFromSql(row.isPlatformAdmin),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  }
+}
+
+export type TenantRole = 'owner' | 'admin' | 'member'
+
+export async function resolveJwtTenantClaims(userId: string): Promise<{
+  isPlatformAdmin: boolean
+  currentTenantId: string | null
+  tenantRole: TenantRole | null
+}> {
+  const db = getDb()
+  const ur = await db.execute({
+    sql: `SELECT "isPlatformAdmin" FROM "User" WHERE "id" = ?`,
+    args: [userId],
+  })
+  const urow = ur.rows[0] as unknown as Record<string, unknown> | undefined
+  const isPlatformAdmin = urow ? boolFromSql(urow.isPlatformAdmin) : false
+  const mr = await db.execute({
+    sql: `SELECT "tenantId", "tenantRole" FROM "UserTenant" WHERE "userId" = ? ORDER BY "createdAt" ASC`,
+    args: [userId],
+  })
+  const memberships = mr.rows as unknown as Record<string, unknown>[]
+  const first = memberships[0]
+  if (!first) {
+    return { isPlatformAdmin, currentTenantId: null, tenantRole: null }
+  }
+  const currentTenantId = String(first.tenantId)
+  const tr = String(first.tenantRole)
+  const tenantRole = tr === 'owner' || tr === 'admin' || tr === 'member' ? tr : null
+  return { isPlatformAdmin, currentTenantId, tenantRole }
+}
+
+export async function getUserTenantMembership(
+  userId: string,
+  tenantId: string
+): Promise<{ tenantRole: TenantRole } | null> {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT "tenantRole" FROM "UserTenant" WHERE "userId" = ? AND "tenantId" = ?`,
+    args: [userId, tenantId],
+  })
+  const row = r.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return null
+  const tr = String(row.tenantRole)
+  if (tr !== 'owner' && tr !== 'admin' && tr !== 'member') return null
+  return { tenantRole: tr }
+}
+
+export async function listTenantsForUser(userId: string) {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT t.*, ut."tenantRole" AS "membershipRole"
+          FROM "Tenant" t
+          INNER JOIN "UserTenant" ut ON ut."tenantId" = t."id"
+          WHERE ut."userId" = ?
+          ORDER BY t."name" ASC`,
+    args: [userId],
+  })
+  return (r.rows as unknown as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    slug: String(row.slug),
+    membershipRole: String(row.membershipRole),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+  }))
+}
+
+export async function listTenantsPlatformOverview() {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT t."id", t."name", t."slug", t."createdAt", t."updatedAt",
+          (SELECT COUNT(*) FROM "Application" a WHERE a."tenantId" = t."id") AS "applicationCount",
+          (SELECT COUNT(*) FROM "UserTenant" ut WHERE ut."tenantId" = t."id") AS "memberCount"
+          FROM "Tenant" t
+          ORDER BY t."createdAt" DESC`,
+    args: [],
+  })
+  return (r.rows as unknown as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    slug: String(row.slug),
+    createdAt: String(row.createdAt),
+    updatedAt: String(row.updatedAt),
+    applicationCount: Number(row.applicationCount ?? 0),
+    memberCount: Number(row.memberCount ?? 0),
+  }))
+}
+
+function slugifyTenantSlug(raw: string): string {
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return s.slice(0, 63) || `tenant-${newId().slice(0, 8)}`
+}
+
+export async function createTenantAsOwner(input: { name: string; slug?: string | null }, ownerUserId: string) {
+  const db = getDb()
+  const id = newId()
+  const slug = slugifyTenantSlug(input.slug?.trim() || input.name)
+  const t = nowIso()
+  await db.execute({
+    sql: `INSERT INTO "Tenant" ("id","name","slug","createdAt","updatedAt") VALUES (?,?,?,?,?)`,
+    args: [id, input.name.trim(), slug, t, t],
+  })
+  await db.execute({
+    sql: `INSERT INTO "UserTenant" ("userId","tenantId","tenantRole","createdAt") VALUES (?,?,?,?)`,
+    args: [ownerUserId, id, 'owner', t],
+  })
+  const out = await db.execute({ sql: `SELECT * FROM "Tenant" WHERE "id" = ?`, args: [id] })
+  const row = out.rows[0] as unknown as Record<string, unknown>
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    slug: String(row.slug),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
   }
@@ -97,12 +219,12 @@ async function loadFeaturesWithPermissionsForAppIds(applicationIds: string[]) {
   return { features, permsByFeature }
 }
 
-export async function listApplications(search: string) {
+export async function listApplications(tenantId: string, search: string) {
   const db = getDb()
-  let sql = `SELECT a.*, o."clientId" AS "oauthClientId" FROM "Application" a LEFT JOIN "OAuth2Client" o ON o."applicationId" = a."id"`
-  const args: SqlArgs = []
+  let sql = `SELECT a.*, o."clientId" AS "oauthClientId" FROM "Application" a LEFT JOIN "OAuth2Client" o ON o."applicationId" = a."id" WHERE a."tenantId" = ?`
+  const args: SqlArgs = [tenantId]
   if (search) {
-    sql += ` WHERE a."name" LIKE ? OR a."code" LIKE ?`
+    sql += ` AND (a."name" LIKE ? OR a."code" LIKE ?)`
     const p = `%${search.replace(/%/g, '')}%`
     args.push(p, p)
   }
@@ -121,11 +243,11 @@ export async function listApplications(search: string) {
   return apps.map((a) => ({ ...a, features: featsByApp.get(a.id) ?? [] }))
 }
 
-export async function getApplicationById(id: string) {
+export async function getApplicationById(id: string, tenantId: string) {
   const db = getDb()
   const r = await db.execute({
-    sql: `SELECT a.*, o."clientId" AS "oauthClientId" FROM "Application" a LEFT JOIN "OAuth2Client" o ON o."applicationId" = a."id" WHERE a."id" = ?`,
-    args: [id],
+    sql: `SELECT a.*, o."clientId" AS "oauthClientId" FROM "Application" a LEFT JOIN "OAuth2Client" o ON o."applicationId" = a."id" WHERE a."id" = ? AND a."tenantId" = ?`,
+    args: [id, tenantId],
   })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
@@ -139,6 +261,7 @@ export async function getApplicationById(id: string) {
 }
 
 export async function createApplication(input: {
+  tenantId: string
   name: string
   code: string
   description?: string | null
@@ -149,37 +272,39 @@ export async function createApplication(input: {
   const t = nowIso()
   const st = input.status === false ? 0 : 1
   await db.execute({
-    sql: `INSERT INTO "Application" ("id","name","code","description","status","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
-    args: [id, input.name, input.code, input.description ?? null, st, t, t],
+    sql: `INSERT INTO "Application" ("id","name","code","description","status","tenantId","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?)`,
+    args: [id, input.name, input.code, input.description ?? null, st, input.tenantId, t, t],
   })
-  return getApplicationById(id)
+  return getApplicationById(id, input.tenantId)
 }
 
 export async function updateApplication(
   id: string,
+  tenantId: string,
   data: { name: string; code: string; description?: string | null; status?: boolean }
 ) {
   const db = getDb()
   const t = nowIso()
   const st = data.status === false ? 0 : 1
   await db.execute({
-    sql: `UPDATE "Application" SET "name"=?, "code"=?, "description"=?, "status"=?, "updatedAt"=? WHERE "id"=?`,
-    args: [data.name, data.code, data.description ?? null, st, t, id],
+    sql: `UPDATE "Application" SET "name"=?, "code"=?, "description"=?, "status"=?, "updatedAt"=? WHERE "id"=? AND "tenantId"=?`,
+    args: [data.name, data.code, data.description ?? null, st, t, id, tenantId],
   })
-  return getApplicationById(id)
+  return getApplicationById(id, tenantId)
 }
 
-export async function deleteApplication(id: string) {
+export async function deleteApplication(id: string, tenantId: string) {
   const db = getDb()
-  await db.execute({ sql: `DELETE FROM "Application" WHERE "id" = ?`, args: [id] })
+  await db.execute({ sql: `DELETE FROM "Application" WHERE "id" = ? AND "tenantId" = ?`, args: [id, tenantId] })
 }
 
-export async function listFeatures(search: string, applicationId: string) {
+export async function listFeatures(tenantId: string, search: string, applicationId: string) {
   const db = getDb()
-  let sql = `SELECT f.*, a."id" as a_id, a."name" as a_name, a."code" as a_code, a."description" as a_description, a."status" as a_status, a."createdAt" as a_createdAt, a."updatedAt" as a_updatedAt
+  let sql = `SELECT f.*, a."id" as a_id, a."name" as a_name, a."code" as a_code, a."description" as a_description, a."status" as a_status, a."tenantId" as a_tenantId, a."createdAt" as a_createdAt, a."updatedAt" as a_updatedAt
               FROM "Feature" f JOIN "Application" a ON a."id" = f."applicationId"`
   const args: SqlArgs = []
-  const cond: string[] = []
+  const cond: string[] = [`a."tenantId" = ?`]
+  args.push(tenantId)
   if (applicationId) {
     cond.push(`f."applicationId" = ?`)
     args.push(applicationId)
@@ -200,6 +325,7 @@ export async function listFeatures(search: string, applicationId: string) {
       code: row.a_code,
       description: row.a_description,
       status: row.a_status,
+      tenantId: row.a_tenantId,
       createdAt: row.a_createdAt,
       updatedAt: row.a_updatedAt,
     })
@@ -211,12 +337,12 @@ export async function listFeatures(search: string, applicationId: string) {
   return out
 }
 
-export async function getFeatureById(id: string) {
+export async function getFeatureById(id: string, tenantId: string) {
   const db = getDb()
   const r = await db.execute({
-    sql: `SELECT f.*, a."id" as a_id, a."name" as a_name, a."code" as a_code, a."description" as a_description, a."status" as a_status, a."createdAt" as a_createdAt, a."updatedAt" as a_updatedAt
-          FROM "Feature" f JOIN "Application" a ON a."id" = f."applicationId" WHERE f."id" = ?`,
-    args: [id],
+    sql: `SELECT f.*, a."id" as a_id, a."name" as a_name, a."code" as a_code, a."description" as a_description, a."status" as a_status, a."tenantId" as a_tenantId, a."createdAt" as a_createdAt, a."updatedAt" as a_updatedAt
+          FROM "Feature" f JOIN "Application" a ON a."id" = f."applicationId" WHERE f."id" = ? AND a."tenantId" = ?`,
+    args: [id, tenantId],
   })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
@@ -226,6 +352,7 @@ export async function getFeatureById(id: string) {
     code: row.a_code,
     description: row.a_description,
     status: row.a_status,
+    tenantId: row.a_tenantId,
     createdAt: row.a_createdAt,
     updatedAt: row.a_updatedAt,
   })
@@ -239,43 +366,61 @@ export async function createFeature(input: {
   code: string
   description?: string | null
   applicationId: string
+  tenantId: string
 }) {
   const db = getDb()
+  const check = await db.execute({
+    sql: `SELECT 1 FROM "Application" WHERE "id" = ? AND "tenantId" = ?`,
+    args: [input.applicationId, input.tenantId],
+  })
+  if (!check.rows[0]) return null
   const id = newId()
   const t = nowIso()
   await db.execute({
     sql: `INSERT INTO "Feature" ("id","name","code","description","applicationId","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
     args: [id, input.name, input.code, input.description ?? null, input.applicationId, t, t],
   })
-  return getFeatureById(id)
+  return getFeatureById(id, input.tenantId)
 }
 
 export async function updateFeature(
   id: string,
+  tenantId: string,
   data: { name: string; code: string; description?: string | null; applicationId: string }
 ) {
   const db = getDb()
+  const check = await db.execute({
+    sql: `SELECT 1 FROM "Application" WHERE "id" = ? AND "tenantId" = ?`,
+    args: [data.applicationId, tenantId],
+  })
+  if (!check.rows[0]) return null
   const t = nowIso()
   await db.execute({
     sql: `UPDATE "Feature" SET "name"=?, "code"=?, "description"=?, "applicationId"=?, "updatedAt"=? WHERE "id"=?`,
     args: [data.name, data.code, data.description ?? null, data.applicationId, t, id],
   })
-  return getFeatureById(id)
+  return getFeatureById(id, tenantId)
 }
 
-export async function deleteFeature(id: string) {
+export async function deleteFeature(id: string, tenantId: string) {
   const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT f."id" FROM "Feature" f JOIN "Application" a ON a."id" = f."applicationId" WHERE f."id" = ? AND a."tenantId" = ?`,
+    args: [id, tenantId],
+  })
+  if (!r.rows[0]) return
   await db.execute({ sql: `DELETE FROM "Feature" WHERE "id" = ?`, args: [id] })
 }
 
-export async function listPermissions(search: string, featureId: string) {
+export async function listPermissions(tenantId: string, search: string, featureId: string) {
   const db = getDb()
   let sql = `SELECT p.*, f."id" as f_id, f."name" as f_name, f."code" as f_code, f."description" as f_description, f."applicationId" as f_applicationId, f."createdAt" as f_createdAt, f."updatedAt" as f_updatedAt,
-              a."id" as app_id, a."name" as app_name, a."code" as app_code, a."description" as app_description, a."status" as app_status, a."createdAt" as app_createdAt, a."updatedAt" as app_updatedAt
+              a."id" as app_id, a."name" as app_name, a."code" as app_code, a."description" as app_description, a."status" as app_status, a."tenantId" as app_tenantId, a."createdAt" as app_createdAt, a."updatedAt" as app_updatedAt
               FROM "Permission" p
               JOIN "Feature" f ON f."id" = p."featureId"
-              JOIN "Application" a ON a."id" = f."applicationId"`
-  const args: SqlArgs = []
+              JOIN "Application" a ON a."id" = f."applicationId"
+              WHERE a."tenantId" = ?`
+  const args: SqlArgs = [tenantId]
   const cond: string[] = []
   if (featureId) {
     cond.push(`p."featureId" = ?`)
@@ -286,7 +431,7 @@ export async function listPermissions(search: string, featureId: string) {
     const p = `%${search.replace(/%/g, '')}%`
     args.push(p, p)
   }
-  if (cond.length) sql += ` WHERE ${cond.join(' AND ')}`
+  if (cond.length) sql += ` AND ${cond.join(' AND ')}`
   sql += ` ORDER BY p."createdAt" DESC`
   const r = await db.execute({ sql, args })
   return (r.rows as unknown as Record<string, unknown>[]).map((row) => {
@@ -306,6 +451,7 @@ export async function listPermissions(search: string, featureId: string) {
         code: row.app_code,
         description: row.app_description,
         status: row.app_status,
+        tenantId: row.app_tenantId,
         createdAt: row.app_createdAt,
         updatedAt: row.app_updatedAt,
       })
@@ -314,16 +460,16 @@ export async function listPermissions(search: string, featureId: string) {
   })
 }
 
-export async function getPermissionById(id: string) {
+export async function getPermissionById(id: string, tenantId: string) {
   const db = getDb()
   const r = await db.execute({
     sql: `SELECT p.*, f."id" as f_id, f."name" as f_name, f."code" as f_code, f."description" as f_description, f."applicationId" as f_applicationId, f."createdAt" as f_createdAt, f."updatedAt" as f_updatedAt,
-              a."id" as app_id, a."name" as app_name, a."code" as app_code, a."description" as app_description, a."status" as app_status, a."createdAt" as app_createdAt, a."updatedAt" as app_updatedAt
+              a."id" as app_id, a."name" as app_name, a."code" as app_code, a."description" as app_description, a."status" as app_status, a."tenantId" as app_tenantId, a."createdAt" as app_createdAt, a."updatedAt" as app_updatedAt
               FROM "Permission" p
               JOIN "Feature" f ON f."id" = p."featureId"
               JOIN "Application" a ON a."id" = f."applicationId"
-              WHERE p."id" = ?`,
-    args: [id],
+              WHERE p."id" = ? AND a."tenantId" = ?`,
+    args: [id, tenantId],
   })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
@@ -343,6 +489,7 @@ export async function getPermissionById(id: string) {
       code: row.app_code,
       description: row.app_description,
       status: row.app_status,
+      tenantId: row.app_tenantId,
       createdAt: row.app_createdAt,
       updatedAt: row.app_updatedAt,
     })
@@ -351,36 +498,56 @@ export async function getPermissionById(id: string) {
 }
 
 export async function createPermission(input: {
+  tenantId: string
   name: string
   code: string
   description?: string | null
   featureId: string
 }) {
   const db = getDb()
+  const ok = await db.execute({
+    sql: `SELECT 1 FROM "Feature" f JOIN "Application" a ON a."id" = f."applicationId" WHERE f."id" = ? AND a."tenantId" = ?`,
+    args: [input.featureId, input.tenantId],
+  })
+  if (!ok.rows[0]) return null
   const id = newId()
   const t = nowIso()
   await db.execute({
     sql: `INSERT INTO "Permission" ("id","name","code","description","featureId","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
     args: [id, input.name, input.code, input.description ?? null, input.featureId, t, t],
   })
-  return getPermissionById(id)
+  return getPermissionById(id, input.tenantId)
 }
 
 export async function updatePermission(
   id: string,
+  tenantId: string,
   data: { name: string; code: string; description?: string | null; featureId: string }
 ) {
   const db = getDb()
+  const ok = await db.execute({
+    sql: `SELECT 1 FROM "Feature" f JOIN "Application" a ON a."id" = f."applicationId" WHERE f."id" = ? AND a."tenantId" = ?`,
+    args: [data.featureId, tenantId],
+  })
+  if (!ok.rows[0]) return null
   const t = nowIso()
   await db.execute({
     sql: `UPDATE "Permission" SET "name"=?, "code"=?, "description"=?, "featureId"=?, "updatedAt"=? WHERE "id"=?`,
     args: [data.name, data.code, data.description ?? null, data.featureId, t, id],
   })
-  return getPermissionById(id)
+  return getPermissionById(id, tenantId)
 }
 
-export async function deletePermission(id: string) {
+export async function deletePermission(id: string, tenantId: string) {
   const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT p."id" FROM "Permission" p
+          JOIN "Feature" f ON f."id" = p."featureId"
+          JOIN "Application" a ON a."id" = f."applicationId"
+          WHERE p."id" = ? AND a."tenantId" = ?`,
+    args: [id, tenantId],
+  })
+  if (!r.rows[0]) return
   await db.execute({ sql: `DELETE FROM "Permission" WHERE "id" = ?`, args: [id] })
 }
 
@@ -447,12 +614,12 @@ async function attachRoleRelations(roles: ReturnType<typeof mapRole>[]) {
   }))
 }
 
-export async function listRoles(search: string) {
+export async function listRoles(tenantId: string, search: string) {
   const db = getDb()
-  let sql = `SELECT * FROM "Role"`
-  const args: SqlArgs = []
+  let sql = `SELECT * FROM "Role" WHERE "tenantId" = ?`
+  const args: SqlArgs = [tenantId]
   if (search) {
-    sql += ` WHERE "name" LIKE ? OR IFNULL("description",'') LIKE ?`
+    sql += ` AND ("name" LIKE ? OR IFNULL("description",'') LIKE ?)`
     const p = `%${search.replace(/%/g, '')}%`
     args.push(p, p)
   }
@@ -462,70 +629,92 @@ export async function listRoles(search: string) {
   return attachRoleRelations(roles)
 }
 
-export async function getRoleById(id: string) {
+export async function getRoleById(id: string, tenantId: string) {
   const db = getDb()
-  const r = await db.execute({ sql: `SELECT * FROM "Role" WHERE "id" = ?`, args: [id] })
+  const r = await db.execute({
+    sql: `SELECT * FROM "Role" WHERE "id" = ? AND "tenantId" = ?`,
+    args: [id, tenantId],
+  })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
   const [full] = await attachRoleRelations([mapRole(row)])
   return full
 }
 
-export async function createRole(input: { name: string; description?: string | null; permissionIds?: string[] }) {
+export async function createRole(input: {
+  tenantId: string
+  name: string
+  description?: string | null
+  permissionIds?: string[]
+}) {
   const db = getDb()
   const id = newId()
   const t = nowIso()
   await db.execute({
-    sql: `INSERT INTO "Role" ("id","name","description","createdAt","updatedAt") VALUES (?,?,?,?,?)`,
-    args: [id, input.name, input.description ?? null, t, t],
+    sql: `INSERT INTO "Role" ("id","name","description","tenantId","createdAt","updatedAt") VALUES (?,?,?,?,?,?)`,
+    args: [id, input.name, input.description ?? null, input.tenantId, t, t],
   })
   if (input.permissionIds?.length) {
     for (const pid of input.permissionIds) {
+      const ok = await getPermissionById(pid, input.tenantId)
+      if (!ok) continue
       await db.execute({
         sql: `INSERT INTO "RolePermission" ("roleId","permissionId","createdAt") VALUES (?,?,?)`,
         args: [id, pid, t],
       })
     }
   }
-  return getRoleById(id)
+  return getRoleById(id, input.tenantId)
 }
 
 export async function updateRole(
   id: string,
+  tenantId: string,
   data: { name: string; description?: string | null; permissionIds?: string[] }
 ) {
   const db = getDb()
+  const existing = await db.execute({
+    sql: `SELECT 1 FROM "Role" WHERE "id" = ? AND "tenantId" = ?`,
+    args: [id, tenantId],
+  })
+  if (!existing.rows[0]) return null
   const t = nowIso()
   await db.execute({
-    sql: `UPDATE "Role" SET "name"=?, "description"=?, "updatedAt"=? WHERE "id"=?`,
-    args: [data.name, data.description ?? null, t, id],
+    sql: `UPDATE "Role" SET "name"=?, "description"=?, "updatedAt"=? WHERE "id"=? AND "tenantId"=?`,
+    args: [data.name, data.description ?? null, t, id, tenantId],
   })
   await db.execute({ sql: `DELETE FROM "RolePermission" WHERE "roleId" = ?`, args: [id] })
   if (data.permissionIds?.length) {
     for (const pid of data.permissionIds) {
+      const ok = await getPermissionById(pid, tenantId)
+      if (!ok) continue
       await db.execute({
         sql: `INSERT INTO "RolePermission" ("roleId","permissionId","createdAt") VALUES (?,?,?)`,
         args: [id, pid, t],
       })
     }
   }
-  return getRoleById(id)
+  return getRoleById(id, tenantId)
 }
 
-export async function deleteRole(id: string) {
+export async function deleteRole(id: string, tenantId: string) {
   const db = getDb()
-  await db.execute({ sql: `DELETE FROM "Role" WHERE "id" = ?`, args: [id] })
+  await db.execute({
+    sql: `DELETE FROM "Role" WHERE "id" = ? AND "tenantId" = ?`,
+    args: [id, tenantId],
+  })
 }
 
-async function attachUserRoles(users: ReturnType<typeof mapUserRow>[]) {
+async function attachUserRoles(users: ReturnType<typeof mapUserRow>[], tenantId: string) {
   const db = getDb()
   const ids = users.map((u) => u.id)
   if (!ids.length) return users.map((u) => ({ ...u, roles: [] as unknown[] }))
   const ph = ids.map(() => '?').join(',')
   const rr = await db.execute({
-    sql: `SELECT ur.*, r."id" as r_id, r."name" as r_name, r."description" as r_description, r."createdAt" as r_createdAt, r."updatedAt" as r_updatedAt
-          FROM "UserRole" ur JOIN "Role" r ON r."id" = ur."roleId" WHERE ur."userId" IN (${ph})`,
-    args: ids,
+    sql: `SELECT ur.*, r."id" as r_id, r."name" as r_name, r."description" as r_description, r."tenantId" as r_tenantId, r."createdAt" as r_createdAt, r."updatedAt" as r_updatedAt
+          FROM "UserRole" ur JOIN "Role" r ON r."id" = ur."roleId" AND r."tenantId" = ?
+          WHERE ur."userId" IN (${ph})`,
+    args: [tenantId, ...ids],
   })
   const byUser = new Map<string, unknown[]>()
   for (const row of rr.rows as unknown as Record<string, unknown>[]) {
@@ -539,6 +728,7 @@ async function attachUserRoles(users: ReturnType<typeof mapUserRow>[]) {
         id: row.r_id,
         name: row.r_name,
         description: row.r_description,
+        tenantId: row.r_tenantId,
         createdAt: row.r_createdAt,
         updatedAt: row.r_updatedAt,
       }),
@@ -547,27 +737,33 @@ async function attachUserRoles(users: ReturnType<typeof mapUserRow>[]) {
   return users.map((u) => ({ ...u, roles: byUser.get(u.id) ?? [] }))
 }
 
-export async function listUsers(search: string) {
+export async function listUsers(tenantId: string, search: string) {
   const db = getDb()
-  let sql = `SELECT * FROM "User"`
-  const args: SqlArgs = []
+  let sql = `SELECT u.* FROM "User" u
+              INNER JOIN "UserTenant" ut ON ut."userId" = u."id" AND ut."tenantId" = ?`
+  const args: SqlArgs = [tenantId]
   if (search) {
-    sql += ` WHERE "name" LIKE ? OR "email" LIKE ?`
+    sql += ` WHERE (u."name" LIKE ? OR u."email" LIKE ?)`
     const p = `%${search.replace(/%/g, '')}%`
     args.push(p, p)
   }
-  sql += ` ORDER BY "createdAt" DESC`
+  sql += ` ORDER BY u."createdAt" DESC`
   const r = await db.execute({ sql, args })
   const users = (r.rows as unknown as Record<string, unknown>[]).map(mapUserRow)
-  return attachUserRoles(users)
+  return attachUserRoles(users, tenantId)
 }
 
-export async function getUserById(id: string) {
+export async function getUserById(id: string, tenantId: string) {
   const db = getDb()
-  const r = await db.execute({ sql: `SELECT * FROM "User" WHERE "id" = ?`, args: [id] })
+  const r = await db.execute({
+    sql: `SELECT u.* FROM "User" u
+          INNER JOIN "UserTenant" ut ON ut."userId" = u."id" AND ut."tenantId" = ?
+          WHERE u."id" = ?`,
+    args: [tenantId, id],
+  })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
-  const [u] = await attachUserRoles([mapUserRow(row)])
+  const [u] = await attachUserRoles([mapUserRow(row)], tenantId)
   return u
 }
 
@@ -578,7 +774,16 @@ export async function findUserByEmail(email: string) {
   return row ? mapUserRow(row) : null
 }
 
+/** 账户级读取（无租户作用域），用于个人资料、改密等 */
+export async function getUserByIdGlobal(id: string) {
+  const db = getDb()
+  const r = await db.execute({ sql: `SELECT * FROM "User" WHERE "id" = ?`, args: [id] })
+  const row = r.rows[0] as unknown as Record<string, unknown> | undefined
+  return row ? mapUserRow(row) : null
+}
+
 export async function createUser(input: {
+  tenantId: string
   name: string
   email: string
   password?: string | null
@@ -596,19 +801,29 @@ export async function createUser(input: {
     sql: `INSERT INTO "User" ("id","name","email","emailVerified","image","password","avatar","status","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
     args: [id, input.name, input.email, null, null, passwordToStore, input.avatar ?? null, st, t, t],
   })
+  await db.execute({
+    sql: `INSERT INTO "UserTenant" ("userId","tenantId","tenantRole","createdAt") VALUES (?,?,?,?)`,
+    args: [id, input.tenantId, 'member', t],
+  })
   if (input.roleIds?.length) {
     for (const rid of input.roleIds) {
+      const role = await db.execute({
+        sql: `SELECT 1 FROM "Role" WHERE "id" = ? AND "tenantId" = ?`,
+        args: [rid, input.tenantId],
+      })
+      if (!role.rows[0]) continue
       await db.execute({
         sql: `INSERT INTO "UserRole" ("userId","roleId","createdAt") VALUES (?,?,?)`,
         args: [id, rid, t],
       })
     }
   }
-  return getUserById(id)
+  return getUserById(id, input.tenantId)
 }
 
 export async function updateUser(
   id: string,
+  tenantId: string,
   data: {
     name: string
     email: string
@@ -619,6 +834,11 @@ export async function updateUser(
   }
 ) {
   const db = getDb()
+  const mem = await db.execute({
+    sql: `SELECT 1 FROM "UserTenant" WHERE "userId" = ? AND "tenantId" = ?`,
+    args: [id, tenantId],
+  })
+  if (!mem.rows[0]) return null
   const t = nowIso()
   const st = data.status === false ? 0 : 1
   let sql = `UPDATE "User" SET "name"=?, "email"=?, "avatar"=?, "status"=?, "updatedAt"=?`
@@ -630,21 +850,51 @@ export async function updateUser(
   sql += ` WHERE "id"=?`
   args.push(id)
   await db.execute({ sql, args })
-  await db.execute({ sql: `DELETE FROM "UserRole" WHERE "userId" = ?`, args: [id] })
+  await db.execute({
+    sql: `DELETE FROM "UserRole" WHERE "userId" = ? AND "roleId" IN (SELECT "id" FROM "Role" WHERE "tenantId" = ?)`,
+    args: [id, tenantId],
+  })
   if (data.roleIds?.length) {
     for (const rid of data.roleIds) {
+      const role = await db.execute({
+        sql: `SELECT 1 FROM "Role" WHERE "id" = ? AND "tenantId" = ?`,
+        args: [rid, tenantId],
+      })
+      if (!role.rows[0]) continue
       await db.execute({
         sql: `INSERT INTO "UserRole" ("userId","roleId","createdAt") VALUES (?,?,?)`,
         args: [id, rid, t],
       })
     }
   }
-  return getUserById(id)
+  return getUserById(id, tenantId)
 }
 
-export async function deleteUser(id: string) {
+/** 从当前租户移除成员；若无任何租户归属则删除账号行 */
+export async function removeUserFromTenant(tenantId: string, userId: string) {
   const db = getDb()
-  await db.execute({ sql: `DELETE FROM "User" WHERE "id" = ?`, args: [id] })
+  await db.execute({
+    sql: `DELETE FROM "UserRole" WHERE "userId" = ? AND "roleId" IN (SELECT "id" FROM "Role" WHERE "tenantId" = ?)`,
+    args: [userId, tenantId],
+  })
+  await db.execute({
+    sql: `DELETE FROM "UserTenant" WHERE "userId" = ? AND "tenantId" = ?`,
+    args: [userId, tenantId],
+  })
+  const rest = await db.execute({
+    sql: `SELECT COUNT(*) as c FROM "UserTenant" WHERE "userId" = ?`,
+    args: [userId],
+  })
+  const n = Number((rest.rows[0] as unknown as { c: number }).c)
+  if (n === 0) {
+    await db.execute({ sql: `DELETE FROM "User" WHERE "id" = ?`, args: [userId] })
+  }
+}
+
+/** 完全删除用户（个人注销等） */
+export async function deleteUserAccountGlobally(userId: string) {
+  const db = getDb()
+  await db.execute({ sql: `DELETE FROM "User" WHERE "id" = ?`, args: [userId] })
 }
 
 export async function listLinkedAccountsByUserId(userId: string) {
@@ -679,7 +929,7 @@ export async function updateUserSelfProfile(
   data: { name: string; email?: string; image?: string | null; avatar?: string | null }
 ) {
   const db = getDb()
-  const user = await getUserById(userId)
+  const user = await getUserByIdGlobal(userId)
   if (!user) return { error: 'not_found' as const }
 
   const emailNext = data.email !== undefined ? data.email.trim() : user.email
@@ -702,7 +952,7 @@ export async function changeUserPassword(
   userId: string,
   input: { currentPassword?: string | null; newPassword: string }
 ) {
-  const user = await getUserById(userId)
+  const user = await getUserByIdGlobal(userId)
   if (!user) return { error: 'not_found' as const }
   const hasPw = userHasPasswordSet(user)
   if (hasPw) {
@@ -723,7 +973,7 @@ export async function unlinkOAuthAccountForUser(
   provider: string,
   providerAccountId: string
 ): Promise<{ ok: true } | { error: 'not_found' | 'last_login_method' | 'not_linked' }> {
-  const user = await getUserById(userId)
+  const user = await getUserByIdGlobal(userId)
   if (!user) return { error: 'not_found' }
   const n = await countLinkedAccountsByUserId(userId)
   const hasPw = userHasPasswordSet(user)
@@ -746,7 +996,7 @@ export async function verifySelfDeleteAccount(
   userId: string,
   opts: { password?: string; confirmEmail?: string }
 ): Promise<{ ok: true } | { error: 'not_found' | 'invalid' }> {
-  const user = await getUserById(userId)
+  const user = await getUserByIdGlobal(userId)
   if (!user) return { error: 'not_found' }
   const hasPw = userHasPasswordSet(user)
   if (hasPw) {
@@ -909,13 +1159,22 @@ export async function upsertSystemConfigRow(input: {
   }
 }
 
-export async function dashboardCounts() {
+export async function dashboardCounts(tenantId: string) {
   const db = getDb()
   const [u, ro, pe, ap] = await Promise.all([
-    db.execute({ sql: `SELECT COUNT(*) as c FROM "User"`, args: [] }),
-    db.execute({ sql: `SELECT COUNT(*) as c FROM "Role"`, args: [] }),
-    db.execute({ sql: `SELECT COUNT(*) as c FROM "Permission"`, args: [] }),
-    db.execute({ sql: `SELECT COUNT(*) as c FROM "Application"`, args: [] }),
+    db.execute({
+      sql: `SELECT COUNT(*) as c FROM "UserTenant" WHERE "tenantId" = ?`,
+      args: [tenantId],
+    }),
+    db.execute({ sql: `SELECT COUNT(*) as c FROM "Role" WHERE "tenantId" = ?`, args: [tenantId] }),
+    db.execute({
+      sql: `SELECT COUNT(*) as c FROM "Permission" p
+            INNER JOIN "Feature" f ON f."id" = p."featureId"
+            INNER JOIN "Application" a ON a."id" = f."applicationId"
+            WHERE a."tenantId" = ?`,
+      args: [tenantId],
+    }),
+    db.execute({ sql: `SELECT COUNT(*) as c FROM "Application" WHERE "tenantId" = ?`, args: [tenantId] }),
   ])
   return {
     userCount: Number((u.rows[0] as unknown as { c: number }).c),

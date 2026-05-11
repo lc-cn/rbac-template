@@ -3,7 +3,8 @@ import type { NextAuthConfig } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import GitHub from 'next-auth/providers/github'
 import Google from 'next-auth/providers/google'
-import { findUserByEmail, listEnabledOAuthProviders } from '@/lib/data-access'
+import { findUserByEmail, getUserTenantMembership, listEnabledOAuthProviders, resolveJwtTenantClaims } from '@/lib/data-access'
+import type { TenantRole } from '@/lib/data-access'
 import { verifyStoredPassword } from '@/lib/password'
 import { LibsqlAdapter } from '@/lib/next-auth-libsql-adapter'
 import { getAuthSecret } from '@/lib/auth-secret'
@@ -136,12 +137,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
         token.name = user.name ?? undefined
         token.email = user.email ?? undefined
         token.picture = user.image ?? undefined
+        const claims = await resolveJwtTenantClaims(user.id)
+        token.currentTenantId = claims.currentTenantId
+        token.isPlatformAdmin = claims.isPlatformAdmin
+        token.tenantRole = claims.tenantRole
       }
       if (trigger === 'update' && session && typeof session === 'object') {
-        const s = session as { name?: string | null; email?: string | null; image?: string | null }
+        const s = session as {
+          name?: string | null
+          email?: string | null
+          image?: string | null
+          currentTenantId?: string | null
+        }
         if ('name' in s) token.name = s.name ?? undefined
         if ('email' in s) token.email = s.email ?? undefined
         if ('image' in s) token.picture = s.image ?? undefined
+        if ('currentTenantId' in s && token.sub) {
+          const raw = s.currentTenantId
+          if (raw === null || raw === undefined || raw === '') {
+            token.currentTenantId = null
+            token.tenantRole = null
+          } else {
+            const m = await getUserTenantMembership(token.sub, String(raw))
+            if (m) {
+              token.currentTenantId = String(raw)
+              token.tenantRole = m.tenantRole
+            }
+          }
+        }
       }
       return token
     },
@@ -152,6 +175,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => ({
         if (token.email != null) session.user.email = token.email as string
         if (token.picture != null) session.user.image = token.picture as string
       }
+      session.currentTenantId = typeof token.currentTenantId === 'string' ? token.currentTenantId : null
+      session.isPlatformAdmin = !!token.isPlatformAdmin
+      const tr = token.tenantRole
+      session.tenantRole =
+        tr === 'owner' || tr === 'admin' || tr === 'member' ? (tr as TenantRole) : null
       return session
     },
   },

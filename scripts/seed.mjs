@@ -20,16 +20,30 @@ const db = createClient({
 
 const now = () => new Date().toISOString()
 
-/** Application 按 code upsert */
+/** 与迁移 006 / schema.sql 默认租户一致 */
+const DEFAULT_TENANT_ID = 'tenant_default'
+
+async function ensureDefaultTenant() {
+  const t = now()
+  await db.execute({
+    sql: `INSERT OR IGNORE INTO "Tenant" ("id","name","slug","createdAt","updatedAt") VALUES (?,?,?,?,?)`,
+    args: [DEFAULT_TENANT_ID, '默认组织', 'default', t, t],
+  })
+}
+
+/** Application 按租户 + code upsert */
 async function upsertApplication() {
   const code = 'rbac-admin'
-  const r = await db.execute({ sql: `SELECT * FROM "Application" WHERE "code" = ?`, args: [code] })
+  const r = await db.execute({
+    sql: `SELECT * FROM "Application" WHERE "tenantId" = ? AND "code" = ?`,
+    args: [DEFAULT_TENANT_ID, code],
+  })
   if (r.rows[0]) return r.rows[0]
   const id = randomUUID()
   const t = now()
   await db.execute({
-    sql: `INSERT INTO "Application" ("id","name","code","description","status","createdAt","updatedAt") VALUES (?,?,?,?,1,?,?)`,
-    args: [id, 'RBAC 管理系统', code, '权限管理后台', t, t],
+    sql: `INSERT INTO "Application" ("id","name","code","description","status","tenantId","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?)`,
+    args: [id, 'RBAC 管理系统', code, '权限管理后台', 1, DEFAULT_TENANT_ID, t, t],
   })
   const out = await db.execute({ sql: `SELECT * FROM "Application" WHERE "id" = ?`, args: [id] })
   return out.rows[0]
@@ -52,7 +66,10 @@ async function upsertFeature(appId, code, name, desc) {
 }
 
 async function upsertPermission(featureId, code, name) {
-  const r = await db.execute({ sql: `SELECT * FROM "Permission" WHERE "code" = ?`, args: [code] })
+  const r = await db.execute({
+    sql: `SELECT * FROM "Permission" WHERE "featureId" = ? AND "code" = ?`,
+    args: [featureId, code],
+  })
   if (r.rows[0]) return r.rows[0]
   const id = randomUUID()
   const t = now()
@@ -65,13 +82,16 @@ async function upsertPermission(featureId, code, name) {
 }
 
 async function upsertRole(name, desc) {
-  const r = await db.execute({ sql: `SELECT * FROM "Role" WHERE "name" = ?`, args: [name] })
+  const r = await db.execute({
+    sql: `SELECT * FROM "Role" WHERE "tenantId" = ? AND "name" = ?`,
+    args: [DEFAULT_TENANT_ID, name],
+  })
   if (r.rows[0]) return r.rows[0]
   const id = randomUUID()
   const t = now()
   await db.execute({
-    sql: `INSERT INTO "Role" ("id","name","description","createdAt","updatedAt") VALUES (?,?,?,?,?)`,
-    args: [id, name, desc, t, t],
+    sql: `INSERT INTO "Role" ("id","name","description","tenantId","createdAt","updatedAt") VALUES (?,?,?,?,?,?)`,
+    args: [id, name, desc, DEFAULT_TENANT_ID, t, t],
   })
   const out = await db.execute({ sql: `SELECT * FROM "Role" WHERE "id" = ?`, args: [id] })
   return out.rows[0]
@@ -90,12 +110,22 @@ async function upsertUser(email, data) {
   if (r.rows[0]) return r.rows[0]
   const id = randomUUID()
   const t = now()
+  const isAdmin = email === 'admin@example.com' ? 1 : 0
   await db.execute({
-    sql: `INSERT INTO "User" ("id","name","email","emailVerified","image","password","avatar","status","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?)`,
-    args: [id, data.name, email, null, null, data.password, null, 1, t, t],
+    sql: `INSERT INTO "User" ("id","name","email","emailVerified","image","password","avatar","status","isPlatformAdmin","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    args: [id, data.name, email, null, null, data.password, null, 1, isAdmin, t, t],
   })
   const out = await db.execute({ sql: `SELECT * FROM "User" WHERE "id" = ?`, args: [id] })
   return out.rows[0]
+}
+
+async function upsertUserTenantOwner(userId, tenantId) {
+  const t = now()
+  await db.execute({
+    sql: `INSERT INTO "UserTenant" ("userId","tenantId","tenantRole","createdAt") VALUES (?,?,?,?)
+          ON CONFLICT("userId", "tenantId") DO UPDATE SET "tenantRole" = excluded."tenantRole"`,
+    args: [userId, tenantId, 'owner', t],
+  })
 }
 
 async function upsertUserRole(userId, roleId) {
@@ -143,6 +173,8 @@ async function upsertSystemConfig(key, value, group, label) {
 async function main() {
   console.log('开始初始化数据...')
 
+  await ensureDefaultTenant()
+
   const app = await upsertApplication()
   const appId = String(app.id)
 
@@ -179,6 +211,7 @@ async function main() {
     name: '系统管理员',
     password: 'admin123',
   })
+  await upsertUserTenantOwner(String(adminUser.id), DEFAULT_TENANT_ID)
   await upsertUserRole(String(adminUser.id), String(adminRole.id))
 
   await upsertOAuth('GitHub', 'github', 'your-github-client-id', 'your-github-client-secret', false)
@@ -210,8 +243,8 @@ async function seedOAuth2DemoClient() {
     'http://127.0.0.1:5173/oauth/callback',
   ])
   await db.execute({
-    sql: `INSERT INTO "Application" ("id","name","code","description","status","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?)`,
-    args: [appId, '示例第三方应用', clientId, null, 1, t, t],
+    sql: `INSERT INTO "Application" ("id","name","code","description","status","tenantId","createdAt","updatedAt") VALUES (?,?,?,?,?,?,?,?)`,
+    args: [appId, '示例第三方应用', clientId, null, 1, DEFAULT_TENANT_ID, t, t],
   })
   await db.execute({
     sql: `INSERT INTO "OAuth2Client" (
