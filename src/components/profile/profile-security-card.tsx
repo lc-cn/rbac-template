@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useI18n } from '@/i18n/context'
+import { broadcastMfaStatusUpdated } from '@/lib/mfa-status-broadcast'
 
 type SecurityStatus = {
   hasPassword: boolean
@@ -64,7 +65,9 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
         toast({ title: t('common.error'), description: data.error ?? t('profile.securityLoadFail'), variant: 'destructive' })
         return
       }
-      setStatus(data as SecurityStatus)
+      const next = data as SecurityStatus
+      setStatus(next)
+      broadcastMfaStatusUpdated({ mfaEnabled: next.mfaEnabled })
     } catch {
       toast({ title: t('common.error'), description: t('profile.securityLoadFail'), variant: 'destructive' })
     } finally {

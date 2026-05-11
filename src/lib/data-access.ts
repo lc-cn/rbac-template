@@ -78,11 +78,19 @@ function mapUserRow(row: Record<string, unknown>) {
 
 export type TenantRole = 'owner' | 'admin' | 'member'
 
-export async function resolveJwtTenantClaims(userId: string): Promise<{
+/**
+ * Issue #10：写入 JWT 的当前租户声明集合。
+ * `currentTenantId` 为 null 时，`tenantRole` / `tenantPermissionCodes` 必须同时为 null，
+ * 避免无租户上下文却携带前一租户的 RBAC 权限（与 `isPlatformAdmin` 平台只读语义对齐）。
+ */
+export type JwtTenantClaims = {
   isPlatformAdmin: boolean
   currentTenantId: string | null
   tenantRole: TenantRole | null
-}> {
+  tenantPermissionCodes: string[] | null
+}
+
+export async function resolveJwtTenantClaims(userId: string): Promise<JwtTenantClaims> {
   const db = getDb()
   const ur = await db.execute({
     sql: `SELECT "isPlatformAdmin" FROM "User" WHERE "id" = ?`,
@@ -97,12 +105,18 @@ export async function resolveJwtTenantClaims(userId: string): Promise<{
   const memberships = mr.rows as unknown as Record<string, unknown>[]
   const first = memberships[0]
   if (!first) {
-    return { isPlatformAdmin, currentTenantId: null, tenantRole: null }
+    return {
+      isPlatformAdmin,
+      currentTenantId: null,
+      tenantRole: null,
+      tenantPermissionCodes: null,
+    }
   }
   const currentTenantId = String(first.tenantId)
   const tr = String(first.tenantRole)
   const tenantRole = tr === 'owner' || tr === 'admin' || tr === 'member' ? tr : null
-  return { isPlatformAdmin, currentTenantId, tenantRole }
+  const tenantPermissionCodes = await listTenantPermissionCodesForUser(userId, currentTenantId)
+  return { isPlatformAdmin, currentTenantId, tenantRole, tenantPermissionCodes }
 }
 
 export async function getUserTenantMembership(
@@ -140,6 +154,31 @@ export async function userHasPermission(
     args: [tenantId, permissionCode, userId],
   })
   return !!r.rows[0]
+}
+
+/**
+ * Issue #10：当前用户在租户内通过 `UserRole` 聚合得到的全部 `Permission.code`（去重、按 code 升序）。
+ *
+ * 与 `userHasPermission` 走同一连结条件（`Role.tenantId` 必须等于目标租户），
+ * 用于把"当前租户下生效的权限快照"写入 JWT / session，并在租户切换时刷新。
+ */
+export async function listTenantPermissionCodesForUser(
+  userId: string,
+  tenantId: string
+): Promise<string[]> {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT DISTINCT p."code" AS "code" FROM "UserRole" ur
+          INNER JOIN "Role" r ON r."id" = ur."roleId" AND r."tenantId" = ?
+          INNER JOIN "RolePermission" rp ON rp."roleId" = r."id"
+          INNER JOIN "Permission" p ON p."id" = rp."permissionId"
+          WHERE ur."userId" = ?
+          ORDER BY p."code" ASC`,
+    args: [tenantId, userId],
+  })
+  return (r.rows as unknown as { code: unknown }[])
+    .map((row) => String(row.code))
+    .filter((code) => code.length > 0)
 }
 
 export async function listTenantsForUser(userId: string) {

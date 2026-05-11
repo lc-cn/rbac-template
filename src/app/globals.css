@@ -308,4 +308,59 @@
   .app-data-table--comfortable tbody .app-table-cell {
     @apply py-3.5 sm:py-4;
   }
+
+  /**
+   * 开发者文档（长文）：版心、侧栏 TOC、正文行高与段间距
+   * 节奏参考 GitHub Docs 类站点（宽栏 + 侧栏 + 舒适 prose）
+   */
+  .docs-doc-shell {
+    @apply border-b border-border/40 bg-muted/20 dark:bg-muted/5;
+  }
+
+  .docs-doc-grid {
+    @apply mx-auto grid w-full max-w-[min(100%,80rem)] grid-cols-1 gap-x-0 gap-y-6 px-4 pb-16 pt-6 sm:px-6 lg:grid-cols-[minmax(0,15.5rem)_minmax(0,1fr)] lg:gap-x-10 lg:px-8 xl:grid-cols-[minmax(0,17rem)_minmax(0,52rem)] xl:gap-x-14 xl:px-10;
+  }
+
+  .docs-toc-heading {
+    @apply mb-3 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  .docs-toc a {
+    @apply underline-offset-2;
+  }
+
+  .docs-prose {
+    @apply text-[0.9375rem] leading-[1.7] text-muted-foreground sm:text-base sm:leading-relaxed;
+  }
+
+  .docs-prose > section > p,
+  .docs-prose p {
+    @apply mb-4 last:mb-0;
+  }
+
+  .docs-prose ul,
+  .docs-prose ol {
+    @apply mb-4 last:mb-0;
+  }
+
+  .docs-prose strong {
+    @apply font-semibold text-foreground;
+  }
+
+  .docs-prose dd {
+    @apply text-muted-foreground;
+  }
+
+  .docs-pre {
+    @apply overflow-x-auto rounded-xl border border-border/60 bg-muted/45 px-3 py-2.5 font-mono text-[0.8125rem] leading-relaxed text-foreground sm:text-sm;
+  }
+
+  /** 单栏说明页（非 OAuth2 长文）标题层级 */
+  .docs-article-h2 {
+    @apply scroll-mt-28 border-b border-border/55 pb-3 text-xl font-semibold tracking-tight text-foreground sm:text-2xl;
+  }
+
+  .docs-article-h3 {
+    @apply scroll-mt-24 text-base font-semibold text-foreground sm:text-lg;
+  }
 }

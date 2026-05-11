@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, startTransition } from 'react'
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +21,8 @@ import { useToast } from '@/hooks/use-toast'
 import { useI18n } from '@/i18n/context'
 import { PageShell, PageHeader, CardToolbar } from '@/components/layout/page-shell'
 import { Plus, Pencil, Trash2, Search, Plug } from 'lucide-react'
+import { PermissionCodes } from '@/lib/permission-codes'
+import { sessionHasTenantRead } from '@/lib/tenant-dashboard-nav-permissions'
 
 interface Application {
   id: string
@@ -33,7 +36,9 @@ interface Application {
 }
 
 export default function ApplicationsPage() {
+  const { data: session } = useSession()
   const { t, locale } = useI18n()
+  const canManageIdp = sessionHasTenantRead(session, PermissionCodes.OAUTH_CLIENT_READ)
   const [apps, setApps] = useState<Application[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
@@ -159,12 +164,16 @@ export default function ApplicationsPage() {
                   <td className="app-table-cell text-muted-foreground">{app.description || '-'}</td>
                   <td className="app-table-cell"><Badge variant="outline">{app.features.length}</Badge></td>
                   <td className="app-table-cell">
-                    <Button variant="outline" size="sm" className="h-8 gap-1.5 px-2 text-xs" asChild>
-                      <Link href={`/applications/${app.id}/idp`}>
-                        <Plug className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
-                        {app.oauthClientId ? t('applications.idpManage') : t('applications.idpConfigure')}
-                      </Link>
-                    </Button>
+                    {canManageIdp ? (
+                      <Button variant="outline" size="sm" className="h-8 gap-1.5 px-2 text-xs" asChild>
+                        <Link href={`/applications/${app.id}/idp`}>
+                          <Plug className="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden />
+                          {app.oauthClientId ? t('applications.idpManage') : t('applications.idpConfigure')}
+                        </Link>
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </td>
                   <td className="app-table-cell">
                     <Badge variant={app.status ? 'default' : 'secondary'}>

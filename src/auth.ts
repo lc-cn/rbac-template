@@ -2,8 +2,18 @@ import NextAuth from 'next-auth'
 import type { NextAuthConfig } from 'next-auth'
 import { encode as defaultEncode } from 'next-auth/jwt'
 import Credentials from 'next-auth/providers/credentials'
-import { findUserByEmail, getUserTenantMembership, resolveJwtTenantClaims } from '@/lib/data-access'
+import {
+  findUserByEmail,
+  getUserTenantMembership,
+  listTenantPermissionCodesForUser,
+  resolveJwtTenantClaims,
+} from '@/lib/data-access'
 import type { TenantRole } from '@/lib/data-access'
+import {
+  applyTenantSwitch,
+  readTenantPermissionCodesFromToken,
+  type TenantClaimsState,
+} from '@/lib/auth-token-mutations'
 import { verifyStoredPassword } from '@/lib/password'
 import { LibsqlAdapter } from '@/lib/next-auth-libsql-adapter'
 import { getAuthSecret } from '@/lib/auth-secret'
@@ -89,6 +99,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.currentTenantId = claims.currentTenantId
         token.isPlatformAdmin = claims.isPlatformAdmin
         token.tenantRole = claims.tenantRole
+        token.tenantPermissionCodes = claims.tenantPermissionCodes
         token.credentialVersion = await getUserCredentialVersion(user.id)
         if (u.requiresMfa) {
           token.mfaPending = true
@@ -105,6 +116,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         } else if (token.credentialVersion !== dbV) {
           return null
         }
+        // 兼容升级前签发的 JWT：旧 token 没有 `tenantPermissionCodes` 字段，此处按需懒填一次，
+        // 避免老会话进入控制台后侧栏与守卫认为「无权限」（与 #11 配合）。
+        const tid = typeof token.currentTenantId === 'string' ? token.currentTenantId : null
+        if (tid) {
+          if (!Array.isArray(token.tenantPermissionCodes)) {
+            token.tenantPermissionCodes = await listTenantPermissionCodesForUser(
+              String(token.sub),
+              tid
+            )
+          }
+        } else if (token.tenantPermissionCodes !== null) {
+          token.tenantPermissionCodes = null
+        }
       }
       if (trigger === 'update' && session && typeof session === 'object') {
         const s = session as {
@@ -117,17 +141,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if ('email' in s) token.email = s.email ?? undefined
         if ('image' in s) token.picture = s.image ?? undefined
         if ('currentTenantId' in s && token.sub) {
-          const raw = s.currentTenantId
-          if (raw === null || raw === undefined || raw === '') {
-            token.currentTenantId = null
-            token.tenantRole = null
-          } else {
-            const m = await getUserTenantMembership(token.sub, String(raw))
-            if (m) {
-              token.currentTenantId = String(raw)
-              token.tenantRole = m.tenantRole
-            }
+          const userId = String(token.sub)
+          const before: TenantClaimsState = {
+            currentTenantId:
+              typeof token.currentTenantId === 'string' ? token.currentTenantId : null,
+            tenantRole:
+              token.tenantRole === 'owner' ||
+              token.tenantRole === 'admin' ||
+              token.tenantRole === 'member'
+                ? (token.tenantRole as TenantRole)
+                : null,
+            tenantPermissionCodes: readTenantPermissionCodesFromToken(
+              token.tenantPermissionCodes
+            ),
           }
+          const next = await applyTenantSwitch(
+            before,
+            { userId, rawTenantId: s.currentTenantId },
+            async (uid, tid) => {
+              const m = await getUserTenantMembership(uid, tid)
+              if (!m) return null
+              const codes = await listTenantPermissionCodesForUser(uid, tid)
+              return { tenantRole: m.tenantRole, tenantPermissionCodes: codes }
+            }
+          )
+          token.currentTenantId = next.currentTenantId
+          token.tenantRole = next.tenantRole
+          token.tenantPermissionCodes = next.tenantPermissionCodes
         }
       }
       return token
@@ -139,11 +179,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (token.email != null) session.user.email = token.email as string
         if (token.picture != null) session.user.image = token.picture as string
       }
-      session.currentTenantId = typeof token.currentTenantId === 'string' ? token.currentTenantId : null
+      const tid = typeof token.currentTenantId === 'string' ? token.currentTenantId : null
+      session.currentTenantId = tid
       session.isPlatformAdmin = !!token.isPlatformAdmin
       const tr = token.tenantRole
       session.tenantRole =
-        tr === 'owner' || tr === 'admin' || tr === 'member' ? (tr as TenantRole) : null
+        tid && (tr === 'owner' || tr === 'admin' || tr === 'member') ? (tr as TenantRole) : null
+      // 无 currentTenantId 一律不向 session 暴露 tenantPermissionCodes，
+      // 防止「平台只读 / 未选租户」会话错误地携带前一租户的 RBAC 权限（Issue #10）。
+      session.tenantPermissionCodes = tid
+        ? readTenantPermissionCodesFromToken(token.tenantPermissionCodes)
+        : null
       session.mfaPending = !!token.mfaPending
       return session
     },

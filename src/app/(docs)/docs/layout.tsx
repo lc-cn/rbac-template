@@ -1,34 +1,21 @@
 import Link from 'next/link'
+import { DocsHeaderNav } from '@/components/docs/docs-header-nav'
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
       <header className="sticky top-0 z-10 border-b border-border/60 bg-card/90 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-6 px-4 sm:h-16 sm:px-6">
-          <div className="flex min-w-0 items-center gap-6">
+        <div className="mx-auto flex min-h-14 max-w-[min(100%,80rem)] flex-col gap-3 px-4 py-3 sm:min-h-16 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6 sm:py-0 lg:px-8 xl:px-10">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6 lg:gap-8">
             <Link href="/docs" className="group shrink-0">
               <span className="block text-sm font-semibold tracking-tight text-foreground group-hover:text-primary">
-                开发者文档
+                产品文档
               </span>
               <span className="hidden text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground sm:block">
-                Identity · OAuth2 · OIDC
+                多租户 · RBAC · OIDC
               </span>
             </Link>
-            <nav className="flex items-center gap-0.5 text-xs sm:gap-1 sm:text-sm" aria-label="文档导航">
-              <Link
-                href="/docs"
-                className="rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground sm:px-3 sm:py-2"
-              >
-                概览
-              </Link>
-              <Link
-                href="/docs/oauth2"
-                className="rounded-lg px-2 py-1.5 text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground sm:px-3 sm:py-2"
-              >
-                <span className="sm:hidden">OAuth2</span>
-                <span className="hidden sm:inline">OAuth2 / OIDC</span>
-              </Link>
-            </nav>
+            <DocsHeaderNav />
           </div>
           <Link
             href="/login"
@@ -38,7 +25,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           </Link>
         </div>
       </header>
-      <main>{children}</main>
+      <main className="min-w-0">{children}</main>
     </div>
   )
 }

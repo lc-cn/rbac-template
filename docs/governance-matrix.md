@@ -11,7 +11,7 @@
 | **平台管理员** | 无 `currentTenantId` 时仅只读平台 API；进入租户后 **无豁免**，须具备 `UserTenant` + 对应 permission |
 | **旁路开关** | 环境变量 `ENFORCE_RBAC_ON_WRITE`：为 `0` / `false` / `no` / `off` 时 **跳过** 第二波 RBAC（仅运维排障；默认开启） |
 
-**数据源**：治理角色以数据库 `UserTenant` 为准；RBAC 以数据库联结查询为准（见 `userHasPermission`）。
+**数据源**：治理角色以数据库 `UserTenant` 为准；RBAC 服务端校验以数据库联结查询为准（见 `userHasPermission`）。**会话快照**：`session.tenantPermissionCodes` 在登录与 `update({ currentTenantId })` 切换租户时由 `listTenantPermissionCodesForUser` 重新解析（Issue #10），仅供前端侧栏 / 入口可见性等读路径预判使用，**不替代** API 端的 `guardTenantRbac` 强校验。
 
 ## 路由对照（治理 × Permission）
 
@@ -70,8 +70,9 @@
 ## 相关代码
 
 - Permission 常量：`src/lib/permission-codes.ts`
-- RBAC 查询：`userHasPermission`（`src/lib/data-access.ts`）
+- RBAC 查询：`userHasPermission` / `listTenantPermissionCodesForUser`（`src/lib/data-access.ts`）
 - 路由守卫：`guardTenantRbac`（`src/lib/rbac-server.ts`）
+- JWT/Session 注入与切租刷新：`resolveJwtTenantClaims`、`applyTenantSwitch`（`src/lib/auth-token-mutations.ts`、`src/auth.ts`）
 - 开关：`enforceTenantRbac`（`src/lib/rbac-env.ts`）
 - 审计清单：`src/lib/tenant-route-permissions.ts`
 - 单测：`pnpm test`

@@ -19,18 +19,24 @@ import {
   Building2,
   ChevronLeft,
   ChevronRight,
+  type LucideIcon,
 } from 'lucide-react'
+import {
+  SIDEBAR_NAV_ACCESS,
+  sidebarTenantLinkVisible,
+  type SidebarNavAccessRow,
+} from '@/lib/tenant-dashboard-nav-permissions'
 
-const navItems = [
-  { href: '/', labelKey: 'nav.dashboard', icon: LayoutDashboard },
-  { href: '/profile', labelKey: 'nav.profile', icon: CircleUser },
-  { href: '/users', labelKey: 'nav.users', icon: Users },
-  { href: '/roles', labelKey: 'nav.roles', icon: Shield },
-  { href: '/permissions', labelKey: 'nav.permissions', icon: Key },
-  { href: '/applications', labelKey: 'nav.applications', icon: AppWindow },
-  { href: '/features', labelKey: 'nav.features', icon: Layers },
-  { href: '/system-config', labelKey: 'nav.systemConfig', icon: Settings },
-] as const
+const iconByHref: Record<string, LucideIcon> = {
+  '/': LayoutDashboard,
+  '/profile': CircleUser,
+  '/users': Users,
+  '/roles': Shield,
+  '/permissions': Key,
+  '/applications': AppWindow,
+  '/features': Layers,
+  '/system-config': Settings,
+}
 
 type SidebarNavProps = {
   /** 点击导航链接后回调（用于关闭移动端抽屉） */
@@ -56,10 +62,18 @@ export function SidebarNav({
 
   const platformItem =
     session?.isPlatformAdmin === true
-      ? [{ href: '/platform', labelKey: 'nav.platform', icon: Building2 } as const]
+      ? [{ href: '/platform', labelKey: 'nav.platform' as const, icon: Building2 } as const]
       : []
 
-  const allNav = [...navItems, ...platformItem]
+  const tenantNav = SIDEBAR_NAV_ACCESS.filter((row: SidebarNavAccessRow) =>
+    sidebarTenantLinkVisible(row, session)
+  ).map((row: SidebarNavAccessRow) => ({
+    href: row.href,
+    labelKey: row.labelKey,
+    icon: iconByHref[row.href] ?? LayoutDashboard,
+  }))
+
+  const allNav = [...tenantNav, ...platformItem]
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

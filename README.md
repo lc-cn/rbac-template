@@ -17,6 +17,8 @@
 
 **租户治理**（`UserTenant.tenantRole`：`owner` / `admin` / `member`）与 **业务 RBAC**（`Permission.code`）是两个维度：前者约束「谁能管理组织成员与治理级角色」，后者约束租户内后台资源的读写。第一波与第二波规则及路由矩阵见 [`docs/governance-matrix.md`](docs/governance-matrix.md)。可通过 **`ENFORCE_RBAC_ON_WRITE`**（默认开启）在运维阶段临时关闭租户内 RBAC 校验。
 
+Phase A **运维与上线策略**（Turso 备份与 PITR、无行级审计时的举证边界、环境变量与账号治理）见 [`docs/phase-a-ops-runbook.md`](docs/phase-a-ops-runbook.md)。
+
 ---
 
 ## 技术栈

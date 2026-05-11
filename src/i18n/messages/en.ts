@@ -53,6 +53,18 @@ export const en: Messages = {
     expandSidebar: 'Expand sidebar',
     collapseSidebar: 'Collapse sidebar',
   },
+  access: {
+    tenantReadDeniedTitle: 'This page is not available',
+    tenantReadDeniedBody:
+      'Your account does not have read access to this area in the current organization. Ask an administrator to assign a role that includes the required permission.',
+    tenantReadDeniedCodeLabel: 'Required permission',
+  },
+  mfaBanner: {
+    ariaLabel: 'MFA reminder',
+    body: 'As an organization owner or admin, enabling multi-factor authentication (MFA) is strongly recommended to protect your account and tenant.',
+    cta: 'Open security settings',
+    dismissAria: 'Dismiss reminder',
+  },
   dashboard: {
     title: 'Dashboard',
     subtitle: 'Overview of your RBAC system',

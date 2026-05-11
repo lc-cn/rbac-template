@@ -51,6 +51,18 @@ export const zh = {
     expandSidebar: '展开侧栏',
     collapseSidebar: '收起侧栏',
   },
+  access: {
+    tenantReadDeniedTitle: '无法访问该页面',
+    tenantReadDeniedBody:
+      '你在当前组织下没有查看此模块的权限。若需要访问，请联系组织管理员为你分配包含相应只读权限的角色。',
+    tenantReadDeniedCodeLabel: '所需权限码',
+  },
+  mfaBanner: {
+    ariaLabel: 'MFA 安全提示',
+    body: '作为组织负责人或管理员，建议开启多因素认证（MFA）以保护账号与租户安全。',
+    cta: '前往安全设置',
+    dismissAria: '关闭提示',
+  },
   dashboard: {
     title: '控制台',
     subtitle: 'RBAC 权限管理系统概览',

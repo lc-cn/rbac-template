@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { consumeInvitationByPlainToken } from '@/lib/data-access'
 import { requireBusinessSession } from '@/lib/console-auth'
+import { featureInvitesEnabled } from '@/lib/wave3-env'
 
 /**
  * 接受租户邀请（需在登录态下调用；无需当前租户上下文）。
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
   try {
     const gate = await requireBusinessSession()
     if (!gate.ok) return gate.response
+    if (!featureInvitesEnabled()) return NextResponse.json({ error: 'not_found' }, { status: 404 })
     const uid = gate.userId
     const email = gate.session.user.email
     if (!email) {

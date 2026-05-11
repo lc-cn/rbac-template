@@ -24,7 +24,7 @@
 
 ## 当前租户上下文
 
-仅通过 **Auth.js JWT / session** 传递 `currentTenantId`（及 `tenantRole`、`isPlatformAdmin`）；**不**用 Cookie 双写。客户端通过 `update({ currentTenantId })` 切换租户，服务端在 `jwt` 回调中校验 `UserTenant` 成员关系。
+仅通过 **Auth.js JWT / session** 传递 `currentTenantId`（及 `tenantRole`、`isPlatformAdmin`、`tenantPermissionCodes`）；**不**用 Cookie 双写。客户端通过 `update({ currentTenantId })` 切换租户，服务端在 `jwt` 回调中校验 `UserTenant` 成员关系，并 **重新解析** 该租户下生效的 `Permission.code` 写入 token，避免跨租户串用（Issue #10）。当 `currentTenantId` 为 `null`（平台只读 / 未选租户），`tenantRole` 与 `tenantPermissionCodes` **同时** 为 `null`。
 
 ## 环境变量
 

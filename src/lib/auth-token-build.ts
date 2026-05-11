@@ -15,6 +15,7 @@ export async function buildSessionJwtClaims(userId: string): Promise<Record<stri
     picture: profileImage,
     currentTenantId: claims.currentTenantId,
     tenantRole: claims.tenantRole,
+    tenantPermissionCodes: claims.tenantPermissionCodes,
     isPlatformAdmin: claims.isPlatformAdmin,
     credentialVersion,
   }

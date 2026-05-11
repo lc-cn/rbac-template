@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/sidebar'
 import { SidebarNav } from '@/components/layout/sidebar-nav'
 import { AppNavbar } from '@/components/layout/app-navbar'
+import { MfaEncouragementBanner } from '@/components/layout/mfa-encouragement-banner'
 import { useSidebarCollapsed } from '@/hooks/use-sidebar-collapsed'
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -53,6 +54,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppNavbar onOpenMobileNav={() => setMobileNavOpen(true)} />
+        <MfaEncouragementBanner />
         <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth overscroll-y-contain [scrollbar-gutter:stable]">
           {children}
         </main>
