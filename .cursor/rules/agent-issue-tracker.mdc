@@ -1,0 +1,21 @@
+---
+description: GitHub Issues — use gh CLI from this repo (details in docs/agents)
+alwaysApply: true
+---
+
+# Issue tracker
+
+Work is tracked as **GitHub Issues** on this repository. Use the **`gh` CLI** from the repo root; the repo is inferred from `git remote`.
+
+Also follow **`AGENTS.md`** at the repo root for Next.js-specific agent rules.
+
+**Essentials**
+
+- Create: `gh issue create --title "…" --body "…"`
+- Read (with discussion): `gh issue view <n> --comments`
+- List / filter: `gh issue list` (add `--label`, `--state` as needed)
+- Comment: `gh issue comment <n> --body "…"`
+- Labels: `gh issue edit <n> --add-label "…"` / `--remove-label "…"`
+- Close: `gh issue close <n> --comment "…"`
+
+Full conventions: `docs/agents/issue-tracker.md`.

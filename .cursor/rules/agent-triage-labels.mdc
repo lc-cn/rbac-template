@@ -1,0 +1,18 @@
+---
+description: Triage label strings for GitHub issues (five roles)
+alwaysApply: true
+---
+
+# Triage labels
+
+Skills such as **triage** use five roles; map them to these **exact** GitHub label names:
+
+| Role | Label |
+|------|-------|
+| Maintainer must evaluate | `needs-triage` |
+| Waiting on reporter | `needs-info` |
+| Fully specified, AFK-agent ready | `ready-for-agent` |
+| Needs human implementation | `ready-for-human` |
+| Will not be actioned | `wontfix` |
+
+Details: `docs/agents/triage-labels.md`.

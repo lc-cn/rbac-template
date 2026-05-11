@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { auth } from '@/auth'
 
-export default auth((req) => {
+// Lazy `NextAuth(async () => …)` makes `auth(mw)` return Promise<handler>; Next requires `proxy` to be a function.
+const withAuth = auth((req) => {
   const { pathname } = req.nextUrl
 
   if (pathname.startsWith('/api/auth')) {
@@ -42,6 +43,13 @@ export default auth((req) => {
 
   return NextResponse.next()
 })
+
+type AuthHandler = Awaited<typeof withAuth>
+
+export async function proxy(request: NextRequest, context: Parameters<AuthHandler>[1]) {
+  const handle = await withAuth
+  return handle(request, context)
+}
 
 export const config = {
   matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],

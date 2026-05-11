@@ -1,0 +1,17 @@
+---
+description: Domain context — CONTEXT.md and docs/adr/ (single-context repo)
+alwaysApply: true
+---
+
+# Domain docs
+
+This repo uses **single-context** domain docs:
+
+- **`CONTEXT.md`** at the repo root — glossary and domain language (read before larger refactors or architecture work when the file exists).
+- **`docs/adr/`** — architecture decision records relevant to the area you are changing.
+
+If those paths are missing, **continue without** insisting the user create them first.
+
+When naming domain concepts (issues, tests, APIs), use terms as defined in `CONTEXT.md` when it exists.
+
+Full consumer rules: `docs/agents/domain.md`.
