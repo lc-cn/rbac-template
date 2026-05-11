@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { listSystemConfigs, upsertSystemConfigRow } from '@/lib/data-access'
+import { PermissionCodes } from '@/lib/permission-codes'
+import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET() {
@@ -8,7 +10,8 @@ export async function GET() {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    void tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.SYSTEM_CONFIG_READ)
+    if (rbac) return rbac
     const configs = await listSystemConfigs()
     return NextResponse.json(configs)
   } catch {
@@ -21,7 +24,8 @@ export async function PUT(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    void tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.SYSTEM_CONFIG_UPDATE)
+    if (rbac) return rbac
     const body = await request.json()
     const { configs } = body
     const results = await Promise.all(

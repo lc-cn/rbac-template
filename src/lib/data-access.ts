@@ -120,6 +120,27 @@ export async function getUserTenantMembership(
   return { tenantRole: tr }
 }
 
+/**
+ * 当前用户在指定租户下是否通过任一 `UserRole` 持有该 permission 码（`Role` 与 `RolePermission` 均带 `tenantId` 作用域）。
+ */
+export async function userHasPermission(
+  userId: string,
+  tenantId: string,
+  permissionCode: string
+): Promise<boolean> {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT 1 AS "x" FROM "UserRole" ur
+          INNER JOIN "Role" r ON r."id" = ur."roleId" AND r."tenantId" = ?
+          INNER JOIN "RolePermission" rp ON rp."roleId" = r."id"
+          INNER JOIN "Permission" p ON p."id" = rp."permissionId" AND p."code" = ?
+          WHERE ur."userId" = ?
+          LIMIT 1`,
+    args: [tenantId, permissionCode, userId],
+  })
+  return !!r.rows[0]
+}
+
 export async function listTenantsForUser(userId: string) {
   const db = getDb()
   const r = await db.execute({

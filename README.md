@@ -15,7 +15,7 @@
 
 ### 安全模型（摘要）
 
-**租户治理**（`UserTenant.tenantRole`：`owner` / `admin` / `member`）与 **业务 RBAC**（权限码）是两个维度：前者约束「谁能管理组织成员与绑定」，后者约束业务资源操作。**第一波**已在 `/api/users` 的成员增删改与 `tenantRole`（admin ↔ member）上对齐治理规则；平台管理员进入租户后 **不** 享有额外写权限。完整矩阵与未收紧端点清单见 [`docs/governance-matrix.md`](docs/governance-matrix.md)。
+**租户治理**（`UserTenant.tenantRole`：`owner` / `admin` / `member`）与 **业务 RBAC**（`Permission.code`）是两个维度：前者约束「谁能管理组织成员与治理级角色」，后者约束租户内后台资源的读写。第一波与第二波规则及路由矩阵见 [`docs/governance-matrix.md`](docs/governance-matrix.md)。可通过 **`ENFORCE_RBAC_ON_WRITE`**（默认开启）在运维阶段临时关闭租户内 RBAC 校验。
 
 ---
 

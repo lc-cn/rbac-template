@@ -181,6 +181,11 @@ async function main() {
   const userFeature = await upsertFeature(appId, 'user-mgmt', '用户管理', '用户的增删改查')
   const roleFeature = await upsertFeature(appId, 'role-mgmt', '角色管理', '角色的增删改查')
   const permFeature = await upsertFeature(appId, 'perm-mgmt', '权限管理', '权限的增删改查')
+  const applicationFeature = await upsertFeature(appId, 'application-mgmt', '应用管理', '租户内应用')
+  const featureModuleFeature = await upsertFeature(appId, 'feature-module-mgmt', '功能模块', '应用下的功能模块')
+  const oauthClientFeature = await upsertFeature(appId, 'oauth-client-mgmt', 'OAuth 客户端', 'OIDC/OAuth2 客户端与密钥')
+  const systemConfigFeature = await upsertFeature(appId, 'system-config-mgmt', '系统配置', '站点与通用配置')
+  const oauthProviderFeature = await upsertFeature(appId, 'oauth-provider-mgmt', 'OAuth 提供商', '登录页 OAuth 提供商')
 
   const permissionsData = [
     ['user:read', '查看用户', userFeature.id],
@@ -195,6 +200,22 @@ async function main() {
     ['perm:create', '创建权限', permFeature.id],
     ['perm:update', '编辑权限', permFeature.id],
     ['perm:delete', '删除权限', permFeature.id],
+    ['application:read', '查看应用', applicationFeature.id],
+    ['application:create', '创建应用', applicationFeature.id],
+    ['application:update', '编辑应用', applicationFeature.id],
+    ['application:delete', '删除应用', applicationFeature.id],
+    ['feature:read', '查看功能模块', featureModuleFeature.id],
+    ['feature:create', '创建功能模块', featureModuleFeature.id],
+    ['feature:update', '编辑功能模块', featureModuleFeature.id],
+    ['feature:delete', '删除功能模块', featureModuleFeature.id],
+    ['oauth_client:read', '查看 OAuth 客户端', oauthClientFeature.id],
+    ['oauth_client:write', '管理 OAuth 客户端', oauthClientFeature.id],
+    ['system_config:read', '查看系统配置', systemConfigFeature.id],
+    ['system_config:update', '更新系统配置', systemConfigFeature.id],
+    ['oauth_provider:read', '查看 OAuth 提供商', oauthProviderFeature.id],
+    ['oauth_provider:create', '创建 OAuth 提供商', oauthProviderFeature.id],
+    ['oauth_provider:update', '更新 OAuth 提供商', oauthProviderFeature.id],
+    ['oauth_provider:delete', '删除 OAuth 提供商', oauthProviderFeature.id],
   ]
 
   const createdPerms = []

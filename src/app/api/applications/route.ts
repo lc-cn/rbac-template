@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { createApplication, isUniqueConstraintError, listApplications } from '@/lib/data-access'
+import { PermissionCodes } from '@/lib/permission-codes'
+import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(request: NextRequest) {
@@ -8,6 +10,8 @@ export async function GET(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_READ)
+    if (rbac) return rbac
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
     const apps = await listApplications(tenantRes, search)
@@ -22,6 +26,8 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_CREATE)
+    if (rbac) return rbac
     const body = await request.json()
     const { name, code, description, status } = body
     const app = await createApplication({

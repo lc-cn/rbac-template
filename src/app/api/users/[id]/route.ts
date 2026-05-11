@@ -14,6 +14,8 @@ import {
   canUpdateOtherUserInTenant,
 } from '@/lib/governance-policy'
 import { governanceForbiddenResponse, requireActorTenantRole } from '@/lib/governance-server'
+import { PermissionCodes } from '@/lib/permission-codes'
+import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,6 +23,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_READ)
+    if (rbac) return rbac
     const { id } = await params
     const user = await getUserById(id, tenantRes)
     if (!user) {
@@ -42,6 +46,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (actor instanceof NextResponse) return actor
     const gov = canUpdateOtherUserInTenant(actor.tenantRole)
     if (!gov.ok) return governanceForbiddenResponse(gov.code)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_UPDATE)
+    if (rbac) return rbac
 
     const { id } = await params
     const body = await request.json()
@@ -99,6 +105,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     const rm = canRemoveMember(actor.tenantRole, targetRole)
     if (!rm.ok) return governanceForbiddenResponse(rm.code)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_DELETE)
+    if (rbac) return rbac
 
     await removeUserFromTenant(tenantRes, id)
     return NextResponse.json({ message: '已从当前租户移除' })

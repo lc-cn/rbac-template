@@ -14,6 +14,10 @@
 
 `UserTenant.tenantRole`：`owner` | `admin` | `member`。用于**组织治理**（邀请、租户设置等语义预留），与 RBAC 业务角色（`Role` / `UserRole`）正交。每个租户**同时仅一名 owner**（部分唯一索引保障）。治理规则与已守卫 API 清单见 [`docs/governance-matrix.md`](docs/governance-matrix.md)。
 
+## 业务 RBAC（第二波）
+
+租户内 API 在具备成员资格的基础上，按 **`Permission.code`** 校验（`UserRole` → `Role` → `RolePermission`）；缺少权限时 HTTP **403**、`{ "error": "forbidden_permission" }`。详见 [`docs/governance-matrix.md`](docs/governance-matrix.md)。
+
 ## 平台管理员（isPlatformAdmin）
 
 `User.isPlatformAdmin`；可进入**无 `currentTenantId`** 的**只读**跨租户总览（`/platform`、`/api/platform/*`）。业务写入仍须先进入目标租户（会话携带 `currentTenantId`）。

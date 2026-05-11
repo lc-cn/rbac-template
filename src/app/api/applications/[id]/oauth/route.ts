@@ -7,6 +7,8 @@ import {
   updateOAuth2ClientAdmin,
 } from '@/lib/oauth2/client-admin'
 import { getApplicationById } from '@/lib/data-access'
+import { PermissionCodes } from '@/lib/permission-codes'
+import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +16,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_READ)
+    if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
     if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
@@ -38,6 +42,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE)
+    if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
     if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
@@ -102,6 +108,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE)
+    if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
     if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })
@@ -158,6 +166,8 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE)
+    if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
     if (!app) return NextResponse.json({ error: '应用不存在' }, { status: 404 })

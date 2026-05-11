@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { createOAuthProvider, isUniqueConstraintError, listOAuthProviders } from '@/lib/data-access'
+import { PermissionCodes } from '@/lib/permission-codes'
+import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET() {
@@ -8,6 +10,8 @@ export async function GET() {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_READ)
+    if (rbac) return rbac
     void tenantRes
     const providers = await listOAuthProviders()
     return NextResponse.json(providers)
@@ -21,7 +25,8 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    void tenantRes
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_CREATE)
+    if (rbac) return rbac
     const body = await request.json()
     const { name, type, clientId, clientSecret, enabled } = body
     const provider = await createOAuthProvider({
