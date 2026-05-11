@@ -211,6 +211,7 @@ export const en: Messages = {
     sectionCallbacks: 'Redirects & logout',
     sectionSecurity: 'Grants & scopes',
     sectionAdvanced: 'Advanced',
+    navSections: 'On this page',
     hintName: 'Shown to end users on the consent screen.',
     hintClientId: 'The RP client_id; cannot be changed after creation.',
     logoUrl: 'App logo URL',

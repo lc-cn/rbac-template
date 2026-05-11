@@ -17,5 +17,12 @@ export default async function ApplicationIdpPage({ params }: PageProps) {
   const dto = await getOAuth2ClientAdminById(id)
   const mode = dto ? 'edit' : 'create'
 
-  return <ApplicationIdpFormPage applicationId={id} mode={mode} initialRow={dto} />
+  return (
+    <ApplicationIdpFormPage
+      applicationId={id}
+      applicationName={app.name}
+      mode={mode}
+      initialRow={dto}
+    />
+  )
 }

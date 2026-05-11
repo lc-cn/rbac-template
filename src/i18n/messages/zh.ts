@@ -208,6 +208,7 @@ export const zh = {
     sectionCallbacks: '回调与登出',
     sectionSecurity: '授权与 scope',
     sectionAdvanced: '高级',
+    navSections: '本页章节',
     hintName: '对用户显示的应用名称，将出现在同意页。',
     hintClientId: '第三方应用使用的 client_id；创建后不可修改。',
     logoUrl: '应用图标 URL',
