@@ -15,6 +15,7 @@ import {
 } from '@/lib/oauth2/store'
 import { verifyPkceS256 } from '@/lib/oauth2/pkce'
 import { signAccessToken, signIdToken } from '@/lib/oauth2/jwt-as'
+import { tenantArchivedBlocksOAuthIssuance } from '@/lib/tenant-lifecycle'
 
 function jsonError(status: number, error: string, description?: string) {
   const b: Record<string, string> = { error }
@@ -106,6 +107,12 @@ async function handleAuthorizationCode(req: NextRequest, body: URLSearchParams) 
 
   const client = await getOAuth2ClientByClientId(clientId)
   if (!client) return jsonError(400, 'invalid_client')
+  if (
+    client.applicationTenantId &&
+    (await tenantArchivedBlocksOAuthIssuance(client.applicationTenantId))
+  ) {
+    return jsonError(400, 'invalid_grant', '租户已归档')
+  }
   if (!clientAllowsGrant(client, 'authorization_code')) {
     return jsonError(400, 'unauthorized_client', '该客户端未启用授权码流程')
   }
@@ -168,6 +175,12 @@ async function handleRefreshToken(req: NextRequest, body: URLSearchParams) {
 
   const client = await getOAuth2ClientByClientId(clientId)
   if (!client) return jsonError(400, 'invalid_client')
+  if (
+    client.applicationTenantId &&
+    (await tenantArchivedBlocksOAuthIssuance(client.applicationTenantId))
+  ) {
+    return jsonError(400, 'invalid_grant', '租户已归档')
+  }
   if (!clientAllowsGrant(client, 'refresh_token')) {
     return jsonError(400, 'unauthorized_client', '该客户端未启用 refresh_token 授权')
   }

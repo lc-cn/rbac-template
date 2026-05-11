@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { getServerAuthSession } from '@/lib/session'
 import { clampAuthorizationCodeTtlMinutes, insertAuthorizationCode } from '@/lib/oauth2/store'
 import { oauthErrRedirect, validateAuthorizeSearchParams } from '@/lib/oauth2/validate-authorize'
+import { tenantArchivedBlocksOAuthIssuance } from '@/lib/tenant-lifecycle'
 
 /**
  * 用户同意 / 拒绝授权后签发授权码（RFC 6749）。
@@ -47,6 +48,12 @@ export async function POST(req: NextRequest) {
 
   if (action !== 'approve') {
     return NextResponse.json({ error: 'invalid_request', error_description: '无效 action' }, { status: 400 })
+  }
+
+  if (client.applicationTenantId) {
+    if (await tenantArchivedBlocksOAuthIssuance(client.applicationTenantId)) {
+      return oauthErrRedirect(redirectUri, 'access_denied', '租户已归档，无法签发新的授权', state)
+    }
   }
 
   const code = randomBytes(32).toString('base64url')

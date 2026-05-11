@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.PERM_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.PERM_READ, request)
     if (rbac) return rbac
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.PERM_CREATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.PERM_CREATE, request)
     if (rbac) return rbac
     const body = await request.json()
     const { name, code, description, featureId } = body

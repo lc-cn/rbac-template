@@ -5,12 +5,12 @@ import { PermissionCodes } from '@/lib/permission-codes'
 import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.SYSTEM_CONFIG_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.SYSTEM_CONFIG_READ, request)
     if (rbac) return rbac
     const configs = await listSystemConfigs()
     return NextResponse.json(configs)
@@ -24,7 +24,7 @@ export async function PUT(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.SYSTEM_CONFIG_UPDATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.SYSTEM_CONFIG_UPDATE, request)
     if (rbac) return rbac
     const body = await request.json()
     const { configs } = body

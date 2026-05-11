@@ -39,3 +39,7 @@
 ## 升级说明
 
 存量库执行 `sql/migrations/006_multi_tenant.sql`（或从新库应用聚合后的 `sql/schema.sql`）。务必事先备份。迁移将创建默认租户 `tenant_default`、回填 `Application`/`Role` 的租户列，并通过 `UserTenant` + `SystemConfig.admin_email` 建立 owner 与平台管理员标记。
+
+## 第三波及后续批次（Issue #6）
+
+协作与生命周期可选能力（迁移 **`007_wave3_collaboration.sql`**）：`Tenant.archivedAt` / `suspendedAt`（暂停或归档后租户内 **变更类 API** 返回 `forbidden_tenant_read_only`）；**Invitation**（邀请令牌仅存哈希）；**OwnerTransferRequest**（owner 移交两阶段）。功能开关：`FEATURE_INVITES`、`FEATURE_OWNER_TRANSFER`（设为 `0`/`false`/`off` 关闭对应路由）。归档租户下 **OAuth** 同意页与 **`/oauth/token`** 不再签发新令牌。

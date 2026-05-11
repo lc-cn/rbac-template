@@ -5,14 +5,13 @@ import { PermissionCodes } from '@/lib/permission-codes'
 import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_READ, request)
     if (rbac) return rbac
-    void tenantRes
     const providers = await listOAuthProviders()
     return NextResponse.json(providers)
   } catch (error) {
@@ -25,7 +24,7 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_CREATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_CREATE, request)
     if (rbac) return rbac
     const body = await request.json()
     const { name, type, clientId, clientSecret, enabled } = body

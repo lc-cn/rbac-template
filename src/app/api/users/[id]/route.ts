@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_READ, request)
     if (rbac) return rbac
     const { id } = await params
     const user = await getUserById(id, tenantRes)
@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (actor instanceof NextResponse) return actor
     const gov = canUpdateOtherUserInTenant(actor.tenantRole)
     if (!gov.ok) return governanceForbiddenResponse(gov.code)
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_UPDATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_UPDATE, request)
     if (rbac) return rbac
 
     const { id } = await params
@@ -105,7 +105,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
     const rm = canRemoveMember(actor.tenantRole, targetRole)
     if (!rm.ok) return governanceForbiddenResponse(rm.code)
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_DELETE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_DELETE, request)
     if (rbac) return rbac
 
     await removeUserFromTenant(tenantRes, id)

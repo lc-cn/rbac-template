@@ -44,6 +44,7 @@
 | `pnpm run db:apply-sql` | 将 `sql/schema.sql`（或指定 `.sql`）应用到库；`schema.sql` 中 DDL 为 `IF NOT EXISTS`，已建库可重复执行以补表/索引。默认应用 `schema.sql` 时若检测到旧版 `OAuth2Client`（无 `applicationId`），会先 `DROP` 该表再建表（IdP 配置清空，需重配或 `pnpm run seed`） |
 | `pnpm run db:apply-sql sql/migrations/002_oauth2_authorization_server.sql` | 旧库仅补 OAuth2 表时使用（新库已含于 `sql/schema.sql`） |
 | `pnpm run db:apply-sql sql/migrations/005_oauth2_client_application_fk.sql` | 仅当库里 `Application` 仍带 `oauthClientId` 等列时执行一次（见 `sql/migrations/README.md`） |
+| `pnpm run db:apply-sql sql/migrations/007_wave3_collaboration.sql` | 存量库启用第三波：租户暂停/归档、邀请、owner 移交等（与 `sql/schema.sql` 同步后结构一致，见 `CONTEXT.md`） |
 | `pnpm run seed` | 写入初始数据（依赖 `.env` 中 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`） |
 
 ---
@@ -299,6 +300,15 @@ src/app/.well-known/openid-configuration/  # OIDC Discovery
 | **P3** | 设备授权、动态注册、更强 SLO/审计、可选 **SAML 2.0** | 规划 |
 
 若你希望下一步优先 **动态客户端注册** 或 **密钥轮换运维**，可单独开需求拆任务。
+
+---
+
+## 从模板到生产（检查清单）
+
+- **密钥与 URL**：`NEXTAUTH_SECRET` / `NEXTAUTH_URL` 为强随机与公网根地址；自建 IdP 时同步 `OAUTH_ISSUER_URL`、OAuth 回调在厂商控制台与库中客户端登记一致。  
+- **默认账号**：种子里的管理员邮箱密码仅在演示环境使用，上线后修改或删除。  
+- **数据库**：生产使用 `libsql://`（如 Turso）；构建流水线若跑 `next build`，为 CI 配置占位 `DATABASE_*`（参见仓库 `.github/workflows/ci.yml`）。  
+- **可选功能**：协作相关路由可通过 `FEATURE_INVITES`、`FEATURE_OWNER_TRANSFER` 关闭（详见 `CONTEXT.md`）。
 
 ---
 

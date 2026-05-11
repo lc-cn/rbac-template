@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.FEATURE_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.FEATURE_READ, request)
     if (rbac) return rbac
     const { id } = await params
     const feature = await getFeatureById(id, tenantRes)
@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.FEATURE_UPDATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.FEATURE_UPDATE, request)
     if (rbac) return rbac
     const { id } = await params
     const body = await request.json()
@@ -47,7 +47,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.FEATURE_DELETE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.FEATURE_DELETE, request)
     if (rbac) return rbac
     const { id } = await params
     await deleteFeature(id, tenantRes)

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_READ, request)
     if (rbac) return rbac
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     if (actor instanceof NextResponse) return actor
     const add = canAddMember(actor.tenantRole)
     if (!add.ok) return governanceForbiddenResponse(add.code)
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_CREATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_CREATE, request)
     if (rbac) return rbac
 
     const body = await request.json()

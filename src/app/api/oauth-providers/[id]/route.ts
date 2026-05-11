@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_READ, request)
     if (rbac) return rbac
     void tenantRes
     const { id } = await params
@@ -27,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_UPDATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_UPDATE, request)
     if (rbac) return rbac
     const { id } = await params
     const body = await request.json()
@@ -47,7 +47,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_DELETE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_PROVIDER_DELETE, request)
     if (rbac) return rbac
     const { id } = await params
     await deleteOAuthProvider(id)

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_READ, request)
     if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
@@ -26,7 +26,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_UPDATE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_UPDATE, request)
     if (rbac) return rbac
     const { id } = await params
     const body = await request.json()
@@ -47,7 +47,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_DELETE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.APPLICATION_DELETE, request)
     if (rbac) return rbac
     const { id } = await params
     await deleteApplication(id, tenantRes)

@@ -1,4 +1,5 @@
 import { getDb, newId, nowIso, boolFromSql, isUniqueConstraintError } from '@/lib/db'
+import { hashInvitationToken, newInvitationPlainToken } from '@/lib/invitation-token'
 import { hashPassword, verifyStoredPassword } from '@/lib/password'
 
 export { isUniqueConstraintError }
@@ -156,6 +157,8 @@ export async function listTenantsForUser(userId: string) {
     name: String(row.name),
     slug: String(row.slug),
     membershipRole: String(row.membershipRole),
+    archivedAt: row.archivedAt == null ? null : String(row.archivedAt),
+    suspendedAt: row.suspendedAt == null ? null : String(row.suspendedAt),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
   }))
@@ -1250,4 +1253,191 @@ export async function dashboardCounts(tenantId: string) {
     permissionCount: Number((pe.rows[0] as unknown as { c: number }).c),
     appCount: Number((ap.rows[0] as unknown as { c: number }).c),
   }
+}
+
+/** Issue #6：暂停 / 归档（运维或 owner 通过 API 切换）。 */
+export async function setTenantLifecycleFields(
+  tenantId: string,
+  patch: { suspended?: boolean; archived?: boolean }
+): Promise<boolean | null> {
+  const db = getDb()
+  const exists = await db.execute({ sql: `SELECT 1 FROM "Tenant" WHERE "id" = ?`, args: [tenantId] })
+  if (!exists.rows[0]) return null
+  const t = nowIso()
+  const sets: string[] = []
+  const args: SqlArgs = []
+  if (patch.suspended !== undefined) {
+    sets.push(`"suspendedAt" = ?`)
+    args.push(patch.suspended ? t : null)
+  }
+  if (patch.archived !== undefined) {
+    sets.push(`"archivedAt" = ?`)
+    args.push(patch.archived ? t : null)
+  }
+  if (!sets.length) return true
+  sets.push(`"updatedAt" = ?`)
+  args.push(t, tenantId)
+  await db.execute({
+    sql: `UPDATE "Tenant" SET ${sets.join(', ')} WHERE "id" = ?`,
+    args,
+  })
+  return true
+}
+
+export async function createInvitationRecord(input: {
+  tenantId: string
+  inviterUserId: string
+  expiresAtIso: string
+  emailConstraint: string | null
+}): Promise<{ id: string; plainToken: string }> {
+  const plain = newInvitationPlainToken()
+  const tokenHash = hashInvitationToken(plain)
+  const id = newId()
+  const t = nowIso()
+  const db = getDb()
+  await db.execute({
+    sql: `INSERT INTO "Invitation" ("id","tenantId","tokenHash","inviterUserId","expiresAt","targetRole","emailConstraint","createdAt")
+          VALUES (?,?,?,?,?,?,?,?)`,
+    args: [
+      id,
+      input.tenantId,
+      tokenHash,
+      input.inviterUserId,
+      input.expiresAtIso,
+      'member',
+      input.emailConstraint,
+      t,
+    ],
+  })
+  return { id, plainToken: plain }
+}
+
+export async function listInvitationsForTenant(tenantId: string) {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT "id", "expiresAt", "consumedAt", "emailConstraint", "createdAt", "inviterUserId"
+          FROM "Invitation" WHERE "tenantId" = ? ORDER BY "createdAt" DESC`,
+    args: [tenantId],
+  })
+  return (r.rows as unknown as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    expiresAt: String(row.expiresAt),
+    consumedAt: row.consumedAt == null ? null : String(row.consumedAt),
+    emailConstraint: row.emailConstraint == null ? null : String(row.emailConstraint),
+    createdAt: String(row.createdAt),
+    inviterUserId: String(row.inviterUserId),
+  }))
+}
+
+export type ConsumeInvitationResult =
+  | { ok: true; tenantId: string }
+  | {
+      ok: false
+      code: 'invalid_token' | 'expired' | 'consumed' | 'email_mismatch' | 'tenant_locked' | 'already_member'
+    }
+
+export async function consumeInvitationByPlainToken(
+  plainToken: string,
+  acceptingUserId: string,
+  acceptingUserEmail: string
+): Promise<ConsumeInvitationResult> {
+  const tokenHash = hashInvitationToken(plainToken.trim())
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT i.*, t."archivedAt" AS "tArchived", t."suspendedAt" AS "tSuspended"
+          FROM "Invitation" i
+          JOIN "Tenant" t ON t."id" = i."tenantId"
+          WHERE i."tokenHash" = ?`,
+    args: [tokenHash],
+  })
+  const row = r.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return { ok: false, code: 'invalid_token' }
+  if (row.consumedAt != null) return { ok: false, code: 'consumed' }
+  const exp = String(row.expiresAt)
+  if (Date.parse(exp) < Date.now()) return { ok: false, code: 'expired' }
+  if (row.tArchived != null || row.tSuspended != null) return { ok: false, code: 'tenant_locked' }
+
+  const emailConstraint =
+    row.emailConstraint == null ? null : String(row.emailConstraint).trim().toLowerCase()
+  if (emailConstraint && acceptingUserEmail.trim().toLowerCase() !== emailConstraint) {
+    return { ok: false, code: 'email_mismatch' }
+  }
+
+  const tenantId = String(row.tenantId)
+  const existing = await db.execute({
+    sql: `SELECT 1 FROM "UserTenant" WHERE "userId" = ? AND "tenantId" = ?`,
+    args: [acceptingUserId, tenantId],
+  })
+  if (existing.rows[0]) return { ok: false, code: 'already_member' }
+
+  const tr = String(row.targetRole)
+  const role: TenantRole = tr === 'admin' ? 'admin' : 'member'
+
+  const t = nowIso()
+  await db.execute({
+    sql: `INSERT INTO "UserTenant" ("userId","tenantId","tenantRole","createdAt") VALUES (?,?,?,?)`,
+    args: [acceptingUserId, tenantId, role, t],
+  })
+  await db.execute({
+    sql: `UPDATE "Invitation" SET "consumedAt" = ? WHERE "id" = ?`,
+    args: [t, String(row.id)],
+  })
+  return { ok: true, tenantId }
+}
+
+export async function createOwnerTransferRequest(
+  tenantId: string,
+  fromUserId: string,
+  toUserId: string,
+  expiresAtIso: string
+): Promise<{ id: string } | null> {
+  const fromM = await getUserTenantMembership(fromUserId, tenantId)
+  if (!fromM || fromM.tenantRole !== 'owner') return null
+  const toM = await getUserTenantMembership(toUserId, tenantId)
+  if (!toM || toM.tenantRole === 'owner') return null
+  if (fromUserId === toUserId) return null
+
+  const db = getDb()
+  const id = newId()
+  const t = nowIso()
+  await db.execute({
+    sql: `INSERT INTO "OwnerTransferRequest" ("id","tenantId","fromUserId","toUserId","status","expiresAt","createdAt") VALUES (?,?,?,?,?,?,?)`,
+    args: [id, tenantId, fromUserId, toUserId, 'pending', expiresAtIso, t],
+  })
+  return { id }
+}
+
+export async function confirmOwnerTransferRequest(
+  requestId: string,
+  tenantId: string,
+  confirmingUserId: string
+): Promise<'ok' | 'not_found' | 'not_pending' | 'wrong_user' | 'expired'> {
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT * FROM "OwnerTransferRequest" WHERE "id" = ? AND "tenantId" = ?`,
+    args: [requestId, tenantId],
+  })
+  const row = r.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return 'not_found'
+  if (String(row.status) !== 'pending') return 'not_pending'
+  if (String(row.toUserId) !== confirmingUserId) return 'wrong_user'
+  if (Date.parse(String(row.expiresAt)) < Date.now()) return 'expired'
+
+  const fromUserId = String(row.fromUserId)
+  const toUserId = String(row.toUserId)
+  const t = nowIso()
+
+  await db.execute({
+    sql: `UPDATE "UserTenant" SET "tenantRole" = 'admin' WHERE "tenantId" = ? AND "userId" = ? AND "tenantRole" = 'owner'`,
+    args: [tenantId, fromUserId],
+  })
+  await db.execute({
+    sql: `UPDATE "UserTenant" SET "tenantRole" = 'owner' WHERE "tenantId" = ? AND "userId" = ?`,
+    args: [tenantId, toUserId],
+  })
+  await db.execute({
+    sql: `UPDATE "OwnerTransferRequest" SET "status" = 'completed', "completedAt" = ? WHERE "id" = ?`,
+    args: [t, requestId],
+  })
+  return 'ok'
 }

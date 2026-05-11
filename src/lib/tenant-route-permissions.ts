@@ -48,4 +48,11 @@ export const TENANT_ROUTE_PERMISSION_AUDIT = [
   { method: 'GET', route: '/api/oauth-providers/[id]', permission: P.OAUTH_PROVIDER_READ, governance: '—', notes: '含 clientSecret' },
   { method: 'PUT', route: '/api/oauth-providers/[id]', permission: P.OAUTH_PROVIDER_UPDATE, governance: '—' },
   { method: 'DELETE', route: '/api/oauth-providers/[id]', permission: P.OAUTH_PROVIDER_DELETE, governance: '—' },
+
+  { method: 'GET', route: '/api/tenants/[tenantId]/invitations', permission: P.USER_READ, governance: '—' },
+  { method: 'POST', route: '/api/tenants/[tenantId]/invitations', permission: P.USER_CREATE, governance: 'owner|admin' },
+  { method: 'PATCH', route: '/api/tenants/[tenantId]/lifecycle', permission: '—', governance: 'owner only' },
+  { method: 'POST', route: '/api/tenants/[tenantId]/owner-transfer', permission: '—', governance: 'owner only' },
+  { method: 'POST', route: '/api/tenants/[tenantId]/owner-transfer/confirm', permission: '—', governance: '受邀用户' },
+  { method: 'POST', route: '/api/invitations/accept', permission: '—', governance: '登录用户；无租户上下文' },
 ] as const

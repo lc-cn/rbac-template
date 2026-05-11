@@ -7,6 +7,7 @@ function pathNeedsTenant(pathname: string): boolean {
     if (pathname.startsWith('/api/auth')) return false
     if (pathname.startsWith('/api/profile')) return false
     if (pathname.startsWith('/api/platform')) return false
+    if (pathname.startsWith('/api/invitations')) return false
     if (pathname === '/api/tenants' || pathname.startsWith('/api/tenants/')) return false
     return true
   }

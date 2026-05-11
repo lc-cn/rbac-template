@@ -5,6 +5,7 @@ import { getDb, newId, nowIso } from '@/lib/db'
 export type OAuth2ClientRow = {
   id: string
   applicationId: string
+  applicationTenantId: string
   clientId: string
   clientSecretHash: string | null
   name: string
@@ -44,6 +45,10 @@ export function mapOAuth2ClientRow(row: Record<string, unknown>): OAuth2ClientRo
   return {
     id: String(row.id),
     applicationId,
+    applicationTenantId:
+      row.applicationTenantId != null && String(row.applicationTenantId).trim() !== ''
+        ? String(row.applicationTenantId).trim()
+        : '',
     clientId: String(row.clientId),
     clientSecretHash: row.clientSecretHash == null ? null : String(row.clientSecretHash),
     name: nameFromJoin || '(应用)',
@@ -110,7 +115,7 @@ export function redirectUriAllowed(redirectUri: string, uris: string[]): boolean
 export async function getOAuth2ClientByClientId(clientId: string): Promise<OAuth2ClientRow | null> {
   const db = getDb()
   const r = await db.execute({
-    sql: `SELECT o.*, a."name" AS "applicationName"
+    sql: `SELECT o.*, a."name" AS "applicationName", a."tenantId" AS "applicationTenantId"
           FROM "OAuth2Client" o
           INNER JOIN "Application" a ON a."id" = o."applicationId"
           WHERE o."clientId" = ?`,

@@ -11,12 +11,12 @@ import { PermissionCodes } from '@/lib/permission-codes'
 import { guardTenantRbac } from '@/lib/rbac-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_READ)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_READ, request)
     if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE, request)
     if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
@@ -108,7 +108,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE, request)
     if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
@@ -161,12 +161,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
-    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE)
+    const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.OAUTH_CLIENT_WRITE, request)
     if (rbac) return rbac
     const { id } = await params
     const app = await getApplicationById(id, tenantRes)
