@@ -12,7 +12,7 @@
 
 ## 租户级角色（tenantRole）
 
-`UserTenant.tenantRole`：`owner` | `admin` | `member`。用于**组织治理**（邀请、租户设置等语义预留），与 RBAC 业务角色（`Role` / `UserRole`）正交。每个租户**同时仅一名 owner**（部分唯一索引保障）。
+`UserTenant.tenantRole`：`owner` | `admin` | `member`。用于**组织治理**（邀请、租户设置等语义预留），与 RBAC 业务角色（`Role` / `UserRole`）正交。每个租户**同时仅一名 owner**（部分唯一索引保障）。治理规则与已守卫 API 清单见 [`docs/governance-matrix.md`](docs/governance-matrix.md)。
 
 ## 平台管理员（isPlatformAdmin）
 

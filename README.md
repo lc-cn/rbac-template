@@ -13,6 +13,10 @@
 - 系统配置（通用 k/v + OAuth2 提供商表，与登录页联动）
 - 登录：邮箱密码；已启用且凭证非占位的 **GitHub / Google** 会出现在登录页
 
+### 安全模型（摘要）
+
+**租户治理**（`UserTenant.tenantRole`：`owner` / `admin` / `member`）与 **业务 RBAC**（权限码）是两个维度：前者约束「谁能管理组织成员与绑定」，后者约束业务资源操作。**第一波**已在 `/api/users` 的成员增删改与 `tenantRole`（admin ↔ member）上对齐治理规则；平台管理员进入租户后 **不** 享有额外写权限。完整矩阵与未收紧端点清单见 [`docs/governance-matrix.md`](docs/governance-matrix.md)。
+
 ---
 
 ## 技术栈
@@ -36,6 +40,7 @@
 | `pnpm start` | 启动生产构建产物 |
 | `pnpm run typecheck` | TypeScript 检查 |
 | `pnpm run lint` | ESLint |
+| `pnpm test` | 单元测试（`node:test`，当前含租户治理策略） |
 | `pnpm run db:apply-sql` | 将 `sql/schema.sql`（或指定 `.sql`）应用到库；`schema.sql` 中 DDL 为 `IF NOT EXISTS`，已建库可重复执行以补表/索引。默认应用 `schema.sql` 时若检测到旧版 `OAuth2Client`（无 `applicationId`），会先 `DROP` 该表再建表（IdP 配置清空，需重配或 `pnpm run seed`） |
 | `pnpm run db:apply-sql sql/migrations/002_oauth2_authorization_server.sql` | 旧库仅补 OAuth2 表时使用（新库已含于 `sql/schema.sql`） |
 | `pnpm run db:apply-sql sql/migrations/005_oauth2_client_application_fk.sql` | 仅当库里 `Application` 仍带 `oauthClientId` 等列时执行一次（见 `sql/migrations/README.md`） |

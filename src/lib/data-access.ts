@@ -705,7 +705,54 @@ export async function deleteRole(id: string, tenantId: string) {
   })
 }
 
-async function attachUserRoles(users: ReturnType<typeof mapUserRow>[], tenantId: string) {
+function parseMembershipTenantRole(row: Record<string, unknown>): TenantRole | null {
+  const raw = row.membershipTenantRole
+  if (raw == null) return null
+  const tr = String(raw)
+  if (tr === 'owner' || tr === 'admin' || tr === 'member') return tr
+  return null
+}
+
+function mapUserRowWithTenantMembership(row: Record<string, unknown>) {
+  const tenantRole = parseMembershipTenantRole(row)
+  const u = mapUserRow(row)
+  return { ...u, tenantRole }
+}
+
+/** 返回用户在租户下的 tenantRole；非成员为 null */
+export async function getUserTenantRole(userId: string, tenantId: string): Promise<TenantRole | null> {
+  const m = await getUserTenantMembership(userId, tenantId)
+  return m?.tenantRole ?? null
+}
+
+/**
+ * 将非 owner 成员的租户治理角色设为 admin 或 member（第一波不支持 owner 行变更）。
+ */
+export async function setUserTenantGovernanceRole(
+  tenantId: string,
+  userId: string,
+  nextRole: 'admin' | 'member'
+): Promise<'ok' | 'not_found' | 'target_is_owner'> {
+  const db = getDb()
+  const cur = await db.execute({
+    sql: `SELECT "tenantRole" FROM "UserTenant" WHERE "userId" = ? AND "tenantId" = ?`,
+    args: [userId, tenantId],
+  })
+  const row = cur.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return 'not_found'
+  const tr = String(row.tenantRole)
+  if (tr === 'owner') return 'target_is_owner'
+  await db.execute({
+    sql: `UPDATE "UserTenant" SET "tenantRole" = ? WHERE "userId" = ? AND "tenantId" = ?`,
+    args: [nextRole, userId, tenantId],
+  })
+  return 'ok'
+}
+
+async function attachUserRoles(
+  users: (ReturnType<typeof mapUserRow> & { tenantRole: TenantRole | null })[],
+  tenantId: string
+) {
   const db = getDb()
   const ids = users.map((u) => u.id)
   if (!ids.length) return users.map((u) => ({ ...u, roles: [] as unknown[] }))
@@ -739,7 +786,7 @@ async function attachUserRoles(users: ReturnType<typeof mapUserRow>[], tenantId:
 
 export async function listUsers(tenantId: string, search: string) {
   const db = getDb()
-  let sql = `SELECT u.* FROM "User" u
+  let sql = `SELECT u.*, ut."tenantRole" AS "membershipTenantRole" FROM "User" u
               INNER JOIN "UserTenant" ut ON ut."userId" = u."id" AND ut."tenantId" = ?`
   const args: SqlArgs = [tenantId]
   if (search) {
@@ -749,21 +796,21 @@ export async function listUsers(tenantId: string, search: string) {
   }
   sql += ` ORDER BY u."createdAt" DESC`
   const r = await db.execute({ sql, args })
-  const users = (r.rows as unknown as Record<string, unknown>[]).map(mapUserRow)
+  const users = (r.rows as unknown as Record<string, unknown>[]).map(mapUserRowWithTenantMembership)
   return attachUserRoles(users, tenantId)
 }
 
 export async function getUserById(id: string, tenantId: string) {
   const db = getDb()
   const r = await db.execute({
-    sql: `SELECT u.* FROM "User" u
+    sql: `SELECT u.*, ut."tenantRole" AS "membershipTenantRole" FROM "User" u
           INNER JOIN "UserTenant" ut ON ut."userId" = u."id" AND ut."tenantId" = ?
           WHERE u."id" = ?`,
     args: [tenantId, id],
   })
   const row = r.rows[0] as unknown as Record<string, unknown> | undefined
   if (!row) return null
-  const [u] = await attachUserRoles([mapUserRow(row)], tenantId)
+  const [u] = await attachUserRoles([mapUserRowWithTenantMembership(row)], tenantId)
   return u
 }
 

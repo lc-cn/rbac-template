@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { createUser, isUniqueConstraintError, listUsers } from '@/lib/data-access'
+import { canAddMember } from '@/lib/governance-policy'
+import { governanceForbiddenResponse, requireActorTenantRole } from '@/lib/governance-server'
 import { requireTenantId } from '@/lib/tenant-server'
 
 export async function GET(request: NextRequest) {
@@ -23,6 +25,11 @@ export async function POST(request: NextRequest) {
     const session = await auth()
     const tenantRes = requireTenantId(session)
     if (tenantRes instanceof NextResponse) return tenantRes
+    const actor = await requireActorTenantRole(session, tenantRes)
+    if (actor instanceof NextResponse) return actor
+    const add = canAddMember(actor.tenantRole)
+    if (!add.ok) return governanceForbiddenResponse(add.code)
+
     const body = await request.json()
     const { name, email, password, avatar, status, roleIds } = body
     const user = await createUser({
