@@ -9,6 +9,7 @@ function pathNeedsTenant(pathname: string): boolean {
     if (pathname.startsWith('/api/platform')) return false
     if (pathname.startsWith('/api/invitations')) return false
     if (pathname === '/api/tenants' || pathname.startsWith('/api/tenants/')) return false
+    if (pathname.startsWith('/api/organizations/current')) return false
     return true
   }
   if (
@@ -23,6 +24,7 @@ function pathNeedsTenant(pathname: string): boolean {
     pathname === '/no-tenant' ||
     pathname === '/profile' ||
     pathname === '/organizations/new' ||
+    pathname === '/organizations/current' ||
     pathname.startsWith('/platform')
   ) {
     return false

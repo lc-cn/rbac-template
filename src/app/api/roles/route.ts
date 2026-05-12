@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.ROLE_READ, request)
     if (rbac) return rbac
     const { searchParams } = new URL(request.url)
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.ROLE_CREATE, request)
     if (rbac) return rbac
     const body = await request.json()

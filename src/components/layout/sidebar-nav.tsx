@@ -17,6 +17,7 @@ import {
   LayoutDashboard,
   CircleUser,
   Building2,
+  Landmark,
   ChevronLeft,
   ChevronRight,
   type LucideIcon,
@@ -29,6 +30,7 @@ import {
 
 const iconByHref: Record<string, LucideIcon> = {
   '/': LayoutDashboard,
+  '/organizations/current': Landmark,
   '/profile': CircleUser,
   '/users': Users,
   '/roles': Shield,

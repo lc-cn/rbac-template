@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const uid = session?.user?.id
     if (!uid) return NextResponse.json({ error: '未登录' }, { status: 401 })
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     if (tenantRes !== tenantId) {
       return NextResponse.json({ error: '请先切换到目标租户后再确认移交' }, { status: 403 })
     }

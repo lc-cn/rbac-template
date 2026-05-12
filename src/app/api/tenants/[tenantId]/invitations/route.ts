@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { tenantId } = await params
     const session = await auth()
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     if (tenantRes !== tenantId) {
       return NextResponse.json({ error: '租户上下文不一致' }, { status: 403 })
     }
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { tenantId } = await params
     const session = await auth()
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     if (tenantRes !== tenantId) {
       return NextResponse.json({ error: '租户上下文不一致' }, { status: 403 })
     }

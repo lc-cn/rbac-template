@@ -8,10 +8,17 @@
 |------|------|
 | **治理** | `owner` / `admin` / `member`：成员增删、`tenantRole` 等（`/api/users` 写路径） |
 | **RBAC** | `Permission.code`（`UserRole` → `Role` → `RolePermission` → `Permission`，且 `Role.tenantId` 与租户一致） |
-| **平台管理员** | 无 `currentTenantId` 时仅只读平台 API；进入租户后 **无豁免**，须具备 `UserTenant` + 对应 permission |
+| **平台管理员** | 无 `currentTenantId` 时可调用 **`/api/platform/*`**（租户列表、租户生命周期 **PATCH** 等，见下表）；进入租户后的业务 API **无豁免**，须具备 `UserTenant` + 对应 permission |
 | **旁路开关** | 环境变量 `ENFORCE_RBAC_ON_WRITE`：为 `0` / `false` / `no` / `off` 时 **跳过** 第二波 RBAC（仅运维排障；默认开启） |
 
 **数据源**：治理角色以数据库 `UserTenant` 为准；RBAC 服务端校验以数据库联结查询为准（见 `userHasPermission`）。**会话快照**：`session.tenantPermissionCodes` 在登录与 `update({ currentTenantId })` 切换租户时由 `listTenantPermissionCodesForUser` 重新解析（Issue #10），仅供前端侧栏 / 入口可见性等读路径预判使用，**不替代** API 端的 `guardTenantRbac` 强校验。
+
+## 平台跨租户 API（`requirePlatformAdmin`）
+
+| Route | Method | Governance | Permission | 备注 |
+|-------|--------|------------|------------|------|
+| `/api/platform/tenants` | GET | — | — | 租户列表（含 `suspendedAt` / `archivedAt` 等字段） |
+| `/api/platform/tenants/[tenantId]/lifecycle` | PATCH | — | — | body 与 `/api/tenants/[tenantId]/lifecycle` 一致；**不支持** `archived: false`（解除归档）；持久化复用 `setTenantLifecycleFields`（Issue #18） |
 
 ## 路由对照（治理 × Permission）
 
@@ -54,7 +61,7 @@
 ### 未纳入本矩阵的租户相关路由（刻意）
 
 - **`/api/profile*`**、**`/api/tenants`**（租户列表/自助创建）：个人账户或创建租户流程，不按上表 permission 守卫。
-- **`/api/platform/*`**：平台只读总览（Issue #4 D1），不靠租户 RBAC。
+- **`/api/platform/*`**：平台跨租户路由（见上文 **平台跨租户 API**）；由 `requirePlatformAdmin` 守卫，**不**走租户内 `Permission.code` 校验。
 - **OAuth 协议端点**（`/api/oauth/consent`、`/oauth/*` 等）：授权流程，不使用上表。
 
 ## 占位（模块已有，路由待接）
@@ -75,4 +82,6 @@
 - JWT/Session 注入与切租刷新：`resolveJwtTenantClaims`、`applyTenantSwitch`（`src/lib/auth-token-mutations.ts`、`src/auth.ts`）
 - 开关：`enforceTenantRbac`（`src/lib/rbac-env.ts`）
 - 审计清单：`src/lib/tenant-route-permissions.ts`
+- 平台管理员 API 门闸：`checkPlatformAdminApiAccess`（`src/lib/platform-admin-gate.ts`）
+- 租户生命周期 PATCH body：`parseTenantLifecyclePatchBody`（`src/lib/tenant-lifecycle-patch.ts`）
 - 单测：`pnpm test`

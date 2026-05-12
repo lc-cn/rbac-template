@@ -1,9 +1,10 @@
 import { getDb } from '@/lib/db'
+import type { TenantLifecycleTimestamps } from '@/lib/tenant-lifecycle-display'
 
-export type TenantLifecycleRow = {
-  suspendedAt: string | null
-  archivedAt: string | null
-}
+export type { TenantLifecycleDisplay } from '@/lib/tenant-lifecycle-display'
+export { resolveTenantLifecycleDisplay } from '@/lib/tenant-lifecycle-display'
+
+export type TenantLifecycleRow = TenantLifecycleTimestamps
 
 export async function getTenantLifecycle(tenantId: string): Promise<TenantLifecycleRow | null> {
   const db = getDb()

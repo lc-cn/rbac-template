@@ -5,6 +5,8 @@
 import { PermissionCodes as P } from './permission-codes.ts'
 
 export const TENANT_ROUTE_PERMISSION_AUDIT = [
+  { method: 'GET', route: '/api/organizations/current', permission: '—', governance: 'UserTenant 成员；会话 currentTenantId' },
+  { method: 'GET', route: '/api/organizations/current/members', permission: '—', governance: 'UserTenant 成员；会话 currentTenantId' },
   { method: 'GET', route: '/api/users', permission: P.USER_READ, governance: '—' },
   { method: 'POST', route: '/api/users', permission: P.USER_CREATE, governance: 'owner|admin' },
   { method: 'GET', route: '/api/users/[id]', permission: P.USER_READ, governance: '—' },

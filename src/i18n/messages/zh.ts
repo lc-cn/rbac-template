@@ -45,7 +45,11 @@ export const zh = {
     universalSearchPlaceholder: '全局搜索用户、角色、权限…',
     openUserMenu: '打开账户菜单',
     profile: '个人中心',
+    currentOrganization: '当前组织',
     tenantSwitcher: '当前租户',
+    findOrganizationPlaceholder: '查找组织…',
+    noMatchingOrganizations: '无匹配的组织',
+    organizationInfo: '组织信息',
     createOrganization: '新建组织',
     createOrganizationShort: '创建组织',
     expandSidebar: '展开侧栏',
@@ -62,6 +66,36 @@ export const zh = {
     body: '作为组织负责人或管理员，建议开启多因素认证（MFA）以保护账号与租户安全。',
     cta: '前往安全设置',
     dismissAria: '关闭提示',
+  },
+  organizationsCurrent: {
+    title: '当前组织',
+    subtitle: '只读展示当前租户上下文中的组织信息。',
+    backHome: '返回控制台',
+    fieldName: '名称',
+    fieldSlug: 'Slug',
+    fieldLifecycle: '生命周期',
+    lifecycleActive: '活跃',
+    lifecycleSuspended: '已暂停',
+    lifecycleArchived: '已归档',
+    members: {
+      title: '成员',
+      subtitle: '本组织成员只读目录（服务端分页）。',
+      searchPlaceholder: '按显示名或邮箱搜索…',
+      colDisplayName: '显示名',
+      colEmail: '邮箱',
+      colRole: '租户角色',
+      youBadge: '你',
+      roleOwner: '负责人',
+      roleAdmin: '管理员',
+      roleMember: '成员',
+      emptyTitle: '没有符合条件的成员',
+      emptyDesc: '可更换关键词，或清空搜索框以从第 1 页查看完整列表。',
+      emptyNoSearch: '该组织暂无成员。',
+      loadError: '加载成员列表失败',
+      prevPage: '上一页',
+      nextPage: '下一页',
+      pageInfo: '第 {{page}} / {{totalPages}} 页 · 共 {{total}} 人',
+    },
   },
   dashboard: {
     title: '控制台',
@@ -443,8 +477,11 @@ export const zh = {
   },
 } as const
 
+/** 文案叶子为 string；允许一层嵌套（如 organizationsCurrent.members）。 */
+type MessageLeaf = string | { readonly [key: string]: string }
+
 export type Messages = {
   [K in keyof typeof zh]: {
-    [P in keyof (typeof zh)[K]]: string
+    [P in keyof (typeof zh)[K]]: MessageLeaf
   }
 }

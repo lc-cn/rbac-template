@@ -1,4 +1,6 @@
 import { getDb, newId, nowIso, boolFromSql, isUniqueConstraintError } from '@/lib/db'
+import { ORGANIZATIONS_CURRENT_MEMBERS_PAGE_SIZE } from '@/lib/organizations-current-members-params'
+import { resolveTenantLifecycleDisplay, type TenantLifecycleDisplay } from '@/lib/tenant-lifecycle-display'
 import { hashInvitationToken, newInvitationPlainToken } from '@/lib/invitation-token'
 import { hashPassword, verifyStoredPassword } from '@/lib/password'
 
@@ -207,6 +209,7 @@ export async function listTenantsPlatformOverview() {
   const db = getDb()
   const r = await db.execute({
     sql: `SELECT t."id", t."name", t."slug", t."createdAt", t."updatedAt",
+          t."suspendedAt", t."archivedAt",
           (SELECT COUNT(*) FROM "Application" a WHERE a."tenantId" = t."id") AS "applicationCount",
           (SELECT COUNT(*) FROM "UserTenant" ut WHERE ut."tenantId" = t."id") AS "memberCount"
           FROM "Tenant" t
@@ -219,6 +222,8 @@ export async function listTenantsPlatformOverview() {
     slug: String(row.slug),
     createdAt: String(row.createdAt),
     updatedAt: String(row.updatedAt),
+    suspendedAt: row.suspendedAt == null ? null : String(row.suspendedAt),
+    archivedAt: row.archivedAt == null ? null : String(row.archivedAt),
     applicationCount: Number(row.applicationCount ?? 0),
     memberCount: Number(row.memberCount ?? 0),
   }))
@@ -1169,6 +1174,111 @@ export async function getTenantDisplay(tenantId: string): Promise<{ name: string
   const row = r.rows[0] as unknown as { name: string; slug: string } | undefined
   if (!row) return null
   return { name: String(row.name), slug: String(row.slug) }
+}
+
+/** Issue #15：仅当 `UserTenant` 存在时返回当前租户摘要，防止仅凭会话 tenantId 跨租户读取。 */
+export type TenantCurrentSummary = {
+  name: string
+  slug: string
+  lifecycle: TenantLifecycleDisplay
+}
+
+export async function getTenantCurrentSummaryForMember(
+  userId: string,
+  tenantId: string
+): Promise<TenantCurrentSummary | null> {
+  const m = await getUserTenantMembership(userId, tenantId)
+  if (!m) return null
+  const db = getDb()
+  const r = await db.execute({
+    sql: `SELECT "name", "slug", "suspendedAt", "archivedAt" FROM "Tenant" WHERE "id" = ?`,
+    args: [tenantId],
+  })
+  const row = r.rows[0] as unknown as Record<string, unknown> | undefined
+  if (!row) return null
+  const life = {
+    suspendedAt: row.suspendedAt == null ? null : String(row.suspendedAt),
+    archivedAt: row.archivedAt == null ? null : String(row.archivedAt),
+  }
+  return {
+    name: String(row.name),
+    slug: String(row.slug),
+    lifecycle: resolveTenantLifecycleDisplay(life),
+  }
+}
+
+function tenantMemberDirectoryLikeArgs(searchTrimmed: string): SqlArgs {
+  const escaped = searchTrimmed.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+  const p = `%${escaped}%`
+  return [p, p]
+}
+
+export type TenantMemberDirectoryRow = {
+  userId: string
+  displayName: string
+  email: string
+  tenantRole: TenantRole
+}
+
+/**
+ * Issue #16：当前租户成员只读分页列表（显示名、邮箱、`UserTenant.tenantRole`）。
+ * 仅当请求者在该租户存在 `UserTenant` 时返回数据，否则 `null`（与 #15 成员校验一致）。
+ */
+export async function listTenantMembersForCurrentOrganizationPage(
+  requestingUserId: string,
+  tenantId: string,
+  options: { page: number; search: string }
+): Promise<{
+  items: TenantMemberDirectoryRow[]
+  total: number
+  page: number
+  pageSize: number
+} | null> {
+  const membership = await getUserTenantMembership(requestingUserId, tenantId)
+  if (!membership) return null
+
+  const pageSize = ORGANIZATIONS_CURRENT_MEMBERS_PAGE_SIZE
+  const page =
+    Number.isFinite(options.page) && options.page >= 1 ? Math.floor(options.page) : 1
+  const search = options.search.trim()
+  const searchClause =
+    search.length > 0
+      ? ` AND (u."name" COLLATE NOCASE LIKE ? ESCAPE '\\' OR u."email" COLLATE NOCASE LIKE ? ESCAPE '\\')`
+      : ''
+  const searchArgs: SqlArgs = search.length > 0 ? tenantMemberDirectoryLikeArgs(search) : []
+
+  const db = getDb()
+  const baseFrom = `FROM "User" u
+          INNER JOIN "UserTenant" ut ON ut."userId" = u."id" AND ut."tenantId" = ?`
+  const baseArgs: SqlArgs = [tenantId, ...searchArgs]
+
+  const cr = await db.execute({
+    sql: `SELECT COUNT(*) AS c ${baseFrom} WHERE 1=1${searchClause}`,
+    args: baseArgs,
+  })
+  const total = Number((cr.rows[0] as unknown as { c: unknown }).c ?? 0)
+
+  const offset = (page - 1) * pageSize
+  const lr = await db.execute({
+    sql: `SELECT u."id", u."name", u."email", ut."tenantRole" AS "membershipTenantRole" ${baseFrom}
+          WHERE 1=1${searchClause}
+          ORDER BY u."name" COLLATE NOCASE ASC, u."id" ASC
+          LIMIT ? OFFSET ?`,
+    args: [...baseArgs, pageSize, offset],
+  })
+
+  const items: TenantMemberDirectoryRow[] = (lr.rows as unknown as Record<string, unknown>[]).map((row) => {
+    const tr = parseMembershipTenantRole(row)
+    const role: TenantRole = tr ?? 'member'
+    return {
+      userId: String(row.id),
+      displayName: String(row.name),
+      email: String(row.email),
+      tenantRole: role,
+    }
+  })
+
+  return { items, total, page, pageSize }
 }
 
 /** Issue #6：暂停 / 归档（运维或 owner 通过 API 切换）。 */

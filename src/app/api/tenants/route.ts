@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const session = await auth()
     const uid = requireUserId(session)
-    if (uid instanceof NextResponse) return uid
+    if (uid instanceof Response) return uid
     const tenants = await listTenantsForUser(uid)
     return NextResponse.json({
       tenants,
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
     const session = await auth()
     const uid = requireUserId(session)
-    if (uid instanceof NextResponse) return uid
+    if (uid instanceof Response) return uid
     const body = (await request.json()) as { name?: unknown; slug?: unknown }
     const name = typeof body.name === 'string' ? body.name.trim() : ''
     if (!name) return NextResponse.json({ error: '租户名称不能为空' }, { status: 400 })

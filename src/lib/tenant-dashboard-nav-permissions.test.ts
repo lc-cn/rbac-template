@@ -11,9 +11,11 @@ describe('tenant-dashboard-nav-permissions', () => {
   it('shows dashboard and profile without tenant', () => {
     const dash = SIDEBAR_NAV_ACCESS.find((r) => r.href === '/')!
     const profile = SIDEBAR_NAV_ACCESS.find((r) => r.href === '/profile')!
+    const currentOrg = SIDEBAR_NAV_ACCESS.find((r) => r.href === '/organizations/current')!
     const s = { currentTenantId: null as string | null, tenantPermissionCodes: null as string[] | null, isPlatformAdmin: false }
     assert.equal(sidebarTenantLinkVisible(dash, s), true)
     assert.equal(sidebarTenantLinkVisible(profile, s), true)
+    assert.equal(sidebarTenantLinkVisible(currentOrg, s), false)
   })
 
   it('hides tenant read nav without matching permission', () => {

@@ -1,22 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { setTenantLifecycleFields } from '@/lib/data-access'
-import { governanceForbiddenResponse, requireActorTenantRole } from '@/lib/governance-server'
-import { parseTenantLifecyclePatchBody } from '@/lib/tenant-lifecycle-patch'
-import { requireTenantId } from '@/lib/tenant-server'
+import { forbidPlatformTenantUnarchive, parseTenantLifecyclePatchBody } from '@/lib/tenant-lifecycle-patch'
+import { requirePlatformAdmin } from '@/lib/tenant-server'
 
-/** owner：切换租户暂停 / 归档（Issue #6 第三波）。PATCH body: `{ "suspended"?: boolean, "archived"?: boolean }` */
+/** 平台管理员：跨租户写入生命周期（Issue #18）。body 与 owner 路由一致；不支持解除归档。 */
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
   try {
     const { tenantId } = await params
     const session = await auth()
-    const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof Response) return tenantRes
-    if (tenantRes !== tenantId) return NextResponse.json({ error: '租户上下文不一致' }, { status: 403 })
-
-    const actor = await requireActorTenantRole(session, tenantId)
-    if (actor instanceof NextResponse) return actor
-    if (actor.tenantRole !== 'owner') return governanceForbiddenResponse('forbidden_owner_only')
+    const denied = requirePlatformAdmin(session)
+    if (denied) return denied
 
     let body: unknown
     try {
@@ -24,10 +18,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     } catch {
       return NextResponse.json({ error: '请求体无效' }, { status: 400 })
     }
+
     const parsed = parseTenantLifecyclePatchBody(body)
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status })
 
-    const ok = await setTenantLifecycleFields(tenantId, parsed.patch)
+    const allowed = forbidPlatformTenantUnarchive(parsed.patch)
+    if (!allowed.ok) return NextResponse.json({ error: allowed.error }, { status: allowed.status })
+
+    const ok = await setTenantLifecycleFields(tenantId, allowed.patch)
     if (ok === null) return NextResponse.json({ error: '租户不存在' }, { status: 404 })
     return NextResponse.json({ ok: true })
   } catch (e) {

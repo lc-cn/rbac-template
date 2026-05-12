@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { listTenantsPlatformOverview } from '@/lib/data-access'
 import { requirePlatformAdmin } from '@/lib/tenant-server'
 
-/** 平台管理员：跨租户只读列表 */
+/** 平台管理员：跨租户租户列表（含生命周期字段）；写路径见 PATCH …/lifecycle */
 export async function GET() {
   try {
     const session = await auth()

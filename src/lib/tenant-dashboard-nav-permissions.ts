@@ -10,6 +10,12 @@ type SessionLike = {
 /** 控制台侧栏项：与租户内 GET API 所需的 read permission 对齐（见 `tenant-route-permissions.ts`）。 */
 export const SIDEBAR_NAV_ACCESS = [
   { href: '/', labelKey: 'nav.dashboard' as const, requiredRead: null as null, showWithoutTenant: true },
+  {
+    href: '/organizations/current',
+    labelKey: 'nav.currentOrganization' as const,
+    requiredRead: null,
+    showWithoutTenant: false,
+  },
   { href: '/profile', labelKey: 'nav.profile' as const, requiredRead: null, showWithoutTenant: true },
   { href: '/users', labelKey: 'nav.users' as const, requiredRead: P.USER_READ, showWithoutTenant: false },
   { href: '/roles', labelKey: 'nav.roles' as const, requiredRead: P.ROLE_READ, showWithoutTenant: false },

@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Menu, Moon, Sun, Monitor, User, LogOut, CircleUser, Building2, Check } from 'lucide-react'
+import { Menu, Moon, Sun, Monitor, User, LogOut, CircleUser, Building2, Check, Landmark, Plus } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { useSession, signOut } from 'next-auth/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -15,8 +15,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useI18n, type Locale } from '@/i18n/context'
+import { SIDEBAR_NAV_ACCESS, sidebarTenantLinkVisible } from '@/lib/tenant-dashboard-nav-permissions'
 
 const locales: Locale[] = ['zh', 'en']
 
@@ -32,6 +34,8 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
   const [mounted, setMounted] = useState(false)
   const [tenants, setTenants] = useState<{ id: string; name: string; slug: string }[]>([])
   const [allowSelfServiceCreate, setAllowSelfServiceCreate] = useState(false)
+  const [tenantFilter, setTenantFilter] = useState('')
+  const tenantMenuTitleId = useId()
 
   useEffect(() => {
     setMounted(true)
@@ -56,6 +60,17 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
 
   const currentTenant = tenants.find((x) => x.id === session?.currentTenantId)
   const tenantLabel = currentTenant?.name ?? session?.currentTenantId ?? '—'
+
+  const currentOrgRow = SIDEBAR_NAV_ACCESS.find((r) => r.href === '/organizations/current')!
+  const showTenantMenuOrganizationInfo = sidebarTenantLinkVisible(currentOrgRow, session)
+
+  const filteredTenants = useMemo(() => {
+    const q = tenantFilter.trim().toLowerCase()
+    if (!q) return tenants
+    return tenants.filter(
+      (ten) => ten.name.toLowerCase().includes(q) || ten.slug.toLowerCase().includes(q)
+    )
+  }, [tenants, tenantFilter])
 
   async function switchTenant(tenantId: string) {
     await update({ currentTenantId: tenantId })
@@ -85,7 +100,11 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
           <>
             {showTenantMenu ? (
               <>
-                <DropdownMenu>
+                <DropdownMenu
+                  onOpenChange={(open) => {
+                    if (open) setTenantFilter('')
+                  }}
+                >
                   <DropdownMenuTrigger asChild>
                     <Button
                       type="button"
@@ -93,6 +112,7 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
                       size="sm"
                       className="h-8 max-w-[11rem] shrink gap-1.5 px-2 font-normal sm:max-w-[14rem]"
                       aria-label={t('nav.tenantSwitcher')}
+                      aria-haspopup="menu"
                     >
                       <Building2 className="h-3.5 w-3.5 shrink-0 opacity-80" />
                       <span className="truncate text-xs sm:text-sm">
@@ -100,34 +120,87 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
                       </span>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>{t('nav.tenantSwitcher')}</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {tenants.map((ten) => (
-                      <DropdownMenuItem
-                        key={ten.id}
-                        className="cursor-pointer gap-2"
-                        onSelect={() => {
-                          void switchTenant(ten.id)
-                        }}
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-72 max-w-[calc(100vw-1rem)] p-0"
+                    aria-labelledby={tenantMenuTitleId}
+                  >
+                    <div className="px-3 pt-2.5 pb-1">
+                      <p id={tenantMenuTitleId} className="text-xs font-semibold text-muted-foreground">
+                        {t('nav.tenantSwitcher')}
+                      </p>
+                    </div>
+                    {tenants.length > 0 ? (
+                      <div
+                        className="border-b border-border/80 px-3 pb-2 pt-1"
+                        onPointerDown={(e) => e.preventDefault()}
                       >
-                        {session?.currentTenantId === ten.id ? (
-                          <Check className="h-4 w-4 shrink-0 opacity-70" />
-                        ) : (
-                          <span className="inline-block w-4 shrink-0" aria-hidden />
-                        )}
-                        <span className="min-w-0 flex-1 truncate">{ten.name}</span>
-                        <span className="text-muted-foreground shrink-0 font-mono text-[10px]">{ten.slug}</span>
-                      </DropdownMenuItem>
-                    ))}
-                    {allowSelfServiceCreate ? (
+                        <Input
+                          value={tenantFilter}
+                          onChange={(e) => setTenantFilter(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          placeholder={t('nav.findOrganizationPlaceholder')}
+                          aria-label={t('nav.findOrganizationPlaceholder')}
+                          className="h-9 rounded-lg text-sm"
+                          autoComplete="off"
+                        />
+                      </div>
+                    ) : null}
+                    <div className="max-h-[min(50vh,260px)] overflow-y-auto p-1">
+                      {tenants.length === 0 ? null : filteredTenants.length === 0 ? (
+                        <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                          {t('nav.noMatchingOrganizations')}
+                        </div>
+                      ) : (
+                        filteredTenants.map((ten) => {
+                          const isCurrent = session?.currentTenantId === ten.id
+                          return (
+                            <DropdownMenuItem
+                              key={ten.id}
+                              aria-current={isCurrent ? 'true' : undefined}
+                              className={cn(
+                                'cursor-pointer gap-2 rounded-lg',
+                                isCurrent && 'bg-muted/60 font-medium'
+                              )}
+                              onSelect={() => {
+                                void switchTenant(ten.id)
+                              }}
+                            >
+                              {isCurrent ? (
+                                <Check className="h-4 w-4 shrink-0 text-foreground opacity-80" aria-hidden />
+                              ) : (
+                                <span className="inline-block w-4 shrink-0" aria-hidden />
+                              )}
+                              <span className="min-w-0 flex-1 truncate">{ten.name}</span>
+                              <span className="text-muted-foreground shrink-0 font-mono text-[10px]">
+                                {ten.slug}
+                              </span>
+                            </DropdownMenuItem>
+                          )
+                        })
+                      )}
+                    </div>
+                    {showTenantMenuOrganizationInfo || allowSelfServiceCreate ? (
                       <>
-                        {tenants.length > 0 ? <DropdownMenuSeparator /> : null}
-                        <DropdownMenuItem asChild className="cursor-pointer">
-                          <Link href="/organizations/new" className="flex w-full items-center">
-                            {t('nav.createOrganization')}
-                          </Link>
-                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="my-0" />
+                        <div className="p-1">
+                          {showTenantMenuOrganizationInfo ? (
+                            <DropdownMenuItem asChild className="cursor-pointer gap-2 rounded-lg">
+                              <Link href="/organizations/current" className="flex w-full items-center gap-2">
+                                <Landmark className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                                {t('nav.organizationInfo')}
+                              </Link>
+                            </DropdownMenuItem>
+                          ) : null}
+                          {allowSelfServiceCreate ? (
+                            <DropdownMenuItem asChild className="cursor-pointer gap-2 rounded-lg">
+                              <Link href="/organizations/new" className="flex w-full items-center gap-2">
+                                <Plus className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                                {t('nav.createOrganization')}
+                              </Link>
+                            </DropdownMenuItem>
+                          ) : null}
+                        </div>
                       </>
                     ) : null}
                   </DropdownMenuContent>

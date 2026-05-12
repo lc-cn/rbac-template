@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     const rbac = await guardTenantRbac(session, tenantRes, PermissionCodes.USER_READ, request)
     if (rbac) return rbac
     const { id } = await params
@@ -41,7 +41,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     const actor = await requireActorTenantRole(session, tenantRes)
     if (actor instanceof NextResponse) return actor
     const gov = canUpdateOtherUserInTenant(actor.tenantRole)
@@ -95,7 +95,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const session = await auth()
     const tenantRes = requireTenantId(session)
-    if (tenantRes instanceof NextResponse) return tenantRes
+    if (tenantRes instanceof Response) return tenantRes
     const actor = await requireActorTenantRole(session, tenantRes)
     if (actor instanceof NextResponse) return actor
     const { id } = await params
