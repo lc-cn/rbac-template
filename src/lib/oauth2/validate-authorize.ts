@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { oauthAuthorizeRedirectUriAllowlist } from '@/lib/oauth2/redirect-allowlist-env'
 import {
   clientAllowsGrant,
   getOAuth2ClientByClientId,
@@ -69,7 +70,7 @@ export async function validateAuthorizeSearchParams(sp: URLSearchParams): Promis
     return { ok: false, response: NextResponse.json({ error: 'invalid_client' }, { status: 400 }) }
   }
 
-  const uris = parseRedirectUris(client.redirectUrisJson)
+  const uris = oauthAuthorizeRedirectUriAllowlist(parseRedirectUris(client.redirectUrisJson))
   if (!redirectUriAllowed(redirectUri, uris)) {
     return {
       ok: false,

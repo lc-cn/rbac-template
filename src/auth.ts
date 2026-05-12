@@ -53,6 +53,8 @@ const providers: NextAuthConfig['providers'] = [
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: LibsqlAdapter(),
   trustHost: true,
+  // NEXTAUTH_URL / AUTH_URL 与当前浏览器 origin 不一致时，NextAuth v5 仍会把 /api/auth 请求改写到
+  // 该变量，导致本地跳到生产。开发换端口请在 .env.local 覆盖 NEXTAUTH_URL。
   secret: getAuthSecret(),
   session: {
     strategy: 'jwt',

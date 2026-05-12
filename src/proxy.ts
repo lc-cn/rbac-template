@@ -36,6 +36,25 @@ type AuthToken = {
   isPlatformAdmin?: boolean
 }
 
+/**
+ * 控制台登录页 `callbackUrl`：仅允许本站同源路径（含以 `/` 开头的站内相对路径），
+ * 防止开放重定向；`//` 协议相对 URL、`/login` 回环回落首页。
+ */
+function safeConsoleCallbackPath(req: NextRequest, raw: string | null): string {
+  if (!raw?.trim()) return '/'
+  const t = raw.trim()
+  if (t.startsWith('//')) return '/'
+  try {
+    const u = t.startsWith('/') ? new URL(t, req.nextUrl.origin) : new URL(t)
+    if (u.origin !== req.nextUrl.origin) return '/'
+    const path = u.pathname + u.search + u.hash
+    if (path === '/login' || path.startsWith('/login?')) return '/'
+    return path || '/'
+  } catch {
+    return '/'
+  }
+}
+
 // Lazy `NextAuth(async () => …)` makes `auth(mw)` return Promise<handler>; Next requires `proxy` to be a function.
 const withAuth = auth((req) => {
   const { pathname } = req.nextUrl
@@ -70,10 +89,9 @@ const withAuth = auth((req) => {
   }
 
   if (token?.user && isLogin) {
-    const url = req.nextUrl.clone()
-    url.pathname = '/'
-    url.searchParams.delete('callbackUrl')
-    return NextResponse.redirect(url)
+    const rawCb = req.nextUrl.searchParams.get('callbackUrl')
+    const path = safeConsoleCallbackPath(req, rawCb)
+    return NextResponse.redirect(new URL(path, req.nextUrl.origin))
   }
 
   if (!token?.user) {

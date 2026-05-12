@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { oauthPostLogoutRedirectUriAllowlist } from '@/lib/oauth2/redirect-allowlist-env'
 import { getOAuth2ClientByClientId, parseRedirectUris, redirectUriAllowed } from '@/lib/oauth2/store'
 
 /**
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_client' }, { status: 400 })
   }
 
-  const allowed = parseRedirectUris(client.postLogoutRedirectUrisJson || '[]')
+  const allowed = oauthPostLogoutRedirectUriAllowlist(parseRedirectUris(client.postLogoutRedirectUrisJson || '[]'))
   if (!redirectUriAllowed(postLogout, allowed)) {
     return NextResponse.json(
       { error: 'invalid_request', error_description: 'post_logout_redirect_uri 未在该客户端登记' },
