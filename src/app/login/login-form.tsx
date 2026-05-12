@@ -114,7 +114,7 @@ export function LoginForm() {
   return (
     <div className="relative z-10 mx-auto flex min-h-[100dvh] w-full max-w-md flex-col justify-center px-4 py-12 sm:py-16">
       <header className="mb-8 text-center sm:mb-10">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/85 text-primary-foreground shadow-lg shadow-primary/20 ring-1 ring-white/10 dark:ring-white/5">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/35 ring-2 ring-white/25 dark:from-indigo-500 dark:via-violet-500 dark:to-indigo-600 dark:shadow-indigo-900/40 dark:ring-white/10">
           <LayoutDashboard className="h-8 w-8" aria-hidden />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">{t('nav.brand')}</h1>
@@ -122,7 +122,7 @@ export function LoginForm() {
         <p className="mt-8 text-sm text-muted-foreground">{t('login.subtitle')}</p>
       </header>
 
-      <div className="rounded-2xl border border-border/60 bg-card/95 p-6 shadow-xl shadow-black/[0.04] ring-1 ring-black/[0.04] backdrop-blur-sm dark:bg-card/90 dark:ring-white/[0.06] sm:p-7">
+      <div className="rounded-2xl border border-indigo-200/45 bg-card/95 p-6 shadow-xl shadow-indigo-500/[0.07] ring-1 ring-indigo-950/[0.04] backdrop-blur-md dark:border-indigo-500/15 dark:bg-card/92 dark:shadow-black/30 dark:ring-white/[0.08] sm:p-7">
         <h2 className="mb-5 text-center text-base font-semibold tracking-tight text-foreground">{t('login.title')}</h2>
         <div className="mb-5 flex gap-2 rounded-xl bg-muted/50 p-1">
           <Button
@@ -219,11 +219,11 @@ export function LoginForm() {
       </div>
 
       <aside
-        className="mt-8 rounded-2xl border border-border/60 bg-gradient-to-br from-muted/40 via-card to-muted/20 p-5 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.05] sm:p-6"
+        className="mt-8 rounded-2xl border border-indigo-200/40 bg-gradient-to-br from-indigo-50/80 via-card to-violet-50/50 p-5 shadow-md shadow-indigo-500/[0.06] ring-1 ring-indigo-950/[0.04] dark:border-indigo-500/15 dark:from-violet-950/30 dark:via-card dark:to-indigo-950/20 dark:shadow-black/20 dark:ring-white/[0.06] sm:p-6"
         aria-label={t('login.docsCtaTitle')}
       >
         <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-violet-500/15 text-primary ring-1 ring-indigo-500/20">
             <BookOpen className="h-5 w-5" aria-hidden />
           </span>
           <div className="min-w-0 flex-1 space-y-2">

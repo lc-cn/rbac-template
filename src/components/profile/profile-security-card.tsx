@@ -264,7 +264,7 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
 
   if (loading || !status) {
     return (
-      <Card>
+      <Card className="mx-auto w-full max-w-xl">
         <CardHeader>
           <CardTitle className="text-base">{t('profile.sectionSecurity')}</CardTitle>
         </CardHeader>
@@ -277,7 +277,7 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
 
   return (
     <>
-      <Card>
+      <Card className="mx-auto w-full max-w-xl">
         <CardHeader>
           <CardTitle className="text-base">{t('profile.sectionSecurity')}</CardTitle>
         </CardHeader>
@@ -287,12 +287,12 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
             {!props.hasPassword ? ` ${t('profile.mfaNeedPassword')}` : null}
           </p>
 
-          <div className="space-y-3 rounded-xl border border-border/60 p-4">
-            <p className="text-sm font-medium">{t('profile.passkeyRegister')}</p>
-            <div className="space-y-2">
-              <Label>{t('profile.passkeyLabel')}</Label>
-              <Input value={pkLabel} onChange={(e) => setPkLabel(e.target.value)} />
-            </div>
+            <div className="space-y-3 rounded-xl border border-border/60 p-4">
+              <p className="text-sm font-medium">{t('profile.passkeyRegister')}</p>
+              <div className="app-form-field">
+                <Label htmlFor="pk-label">{t('profile.passkeyLabel')}</Label>
+                <Input id="pk-label" className="w-full" value={pkLabel} onChange={(e) => setPkLabel(e.target.value)} />
+              </div>
             <div className="flex items-center gap-2">
               <Checkbox id="pk-login" checked={pkLogin} onCheckedChange={(c) => setPkLogin(c === true)} />
               <Label htmlFor="pk-login" className="font-normal">
@@ -328,11 +328,18 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
           ) : null}
 
           {props.hasPassword && !status.mfaEnabled ? (
-            <div className="space-y-4 rounded-xl border border-border/60 p-4">
+              <div className="space-y-4 rounded-xl border border-border/60 p-4">
               <p className="text-sm font-medium">{t('profile.mfaEnableTotp')}</p>
-              <div className="space-y-2">
-                <Label>{t('profile.confirmPassword')}</Label>
-                <Input type="password" value={totpPw} onChange={(e) => setTotpPw(e.target.value)} autoComplete="current-password" />
+              <div className="app-form-field">
+                <Label htmlFor="totp-pw">{t('profile.confirmPassword')}</Label>
+                <Input
+                  id="totp-pw"
+                  type="password"
+                  className="w-full"
+                  value={totpPw}
+                  onChange={(e) => setTotpPw(e.target.value)}
+                  autoComplete="current-password"
+                />
               </div>
               {!totpOtpauth ? (
                 <Button type="button" variant="secondary" disabled={totpBusy || !totpPw} onClick={() => void startTotp()}>
@@ -340,10 +347,12 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
                 </Button>
               ) : null}
               {totpOtpauth ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <p className="break-all text-xs text-muted-foreground">{totpOtpauth}</p>
-                  <Label>{t('mfa.totpLabel')}</Label>
-                  <Input value={totpCode} onChange={(e) => setTotpCode(e.target.value)} />
+                  <div className="app-form-field">
+                    <Label htmlFor="totp-code">{t('mfa.totpLabel')}</Label>
+                    <Input id="totp-code" className="w-full" value={totpCode} onChange={(e) => setTotpCode(e.target.value)} />
+                  </div>
                   <Button type="button" disabled={totpBusy} onClick={() => void confirmTotp()}>
                     {totpBusy ? t('common.loading') : t('profile.totpConfirm')}
                   </Button>
@@ -353,9 +362,19 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
           ) : null}
 
           {props.hasPassword && !status.mfaEnabled && status.passkeys.some((p) => p.canMfa) ? (
-            <div className="space-y-2 rounded-xl border border-border/60 p-4">
+            <div className="space-y-3 rounded-xl border border-border/60 p-4">
               <p className="text-sm font-medium">{t('profile.mfaEnablePasskey')}</p>
-              <Input type="password" placeholder={t('profile.confirmPassword')} value={mfaPw} onChange={(e) => setMfaPw(e.target.value)} />
+              <div className="app-form-field">
+                <Label htmlFor="mfa-pw-passkey">{t('profile.confirmPassword')}</Label>
+                <Input
+                  id="mfa-pw-passkey"
+                  type="password"
+                  className="w-full"
+                  value={mfaPw}
+                  onChange={(e) => setMfaPw(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
               <Button type="button" variant="secondary" disabled={totpBusy} onClick={() => void enablePasskeyMfa()}>
                 {t('profile.mfaEnablePasskey')}
               </Button>
@@ -363,20 +382,26 @@ export function ProfileSecurityCard(props: { hasPassword: boolean }) {
           ) : null}
 
           {props.hasPassword && status.mfaEnabled ? (
-            <div className="flex flex-wrap gap-2">
-              <Input
-                type="password"
-                className="max-w-xs"
-                placeholder={t('profile.confirmPassword')}
-                value={mfaPw}
-                onChange={(e) => setMfaPw(e.target.value)}
-              />
-              <Button type="button" variant="outline" disabled={totpBusy} onClick={() => void rotateBackup()}>
-                {t('profile.mfaBackupRotate')}
-              </Button>
-              <Button type="button" variant="destructive" disabled={totpBusy} onClick={() => void disableMfa()}>
-                {t('profile.mfaDisable')}
-              </Button>
+            <div className="space-y-3">
+              <div className="app-form-field">
+                <Label htmlFor="mfa-rotate-pw">{t('profile.confirmPassword')}</Label>
+                <Input
+                  id="mfa-rotate-pw"
+                  type="password"
+                  className="w-full"
+                  value={mfaPw}
+                  onChange={(e) => setMfaPw(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" disabled={totpBusy} onClick={() => void rotateBackup()}>
+                  {t('profile.mfaBackupRotate')}
+                </Button>
+                <Button type="button" variant="destructive" disabled={totpBusy} onClick={() => void disableMfa()}>
+                  {t('profile.mfaDisable')}
+                </Button>
+              </div>
             </div>
           ) : null}
         </CardContent>

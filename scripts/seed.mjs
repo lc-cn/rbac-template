@@ -1,8 +1,8 @@
 /**
  * 使用 @libsql/client 初始化种子数据（不再依赖 Prisma）。
- * 用法：pnpm run seed（需 .env 中 DATABASE_URL=libsql://... 与 DATABASE_AUTH_TOKEN）
+ * 用法：pnpm run seed（需根目录 `.env.local` 或 `.env` 中含 DATABASE_URL=libsql://... 与 DATABASE_AUTH_TOKEN）
  */
-import 'dotenv/config'
+import './dotenv-config.mjs'
 import { createClient } from '@libsql/client'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'

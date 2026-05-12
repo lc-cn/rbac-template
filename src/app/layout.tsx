@@ -25,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className={cn(inter.className, 'min-h-screen antialiased')}>
+      <body className={cn(inter.className, 'min-h-screen antialiased selection:bg-primary/10 selection:text-foreground')}>
         <Providers>
           {children}
           <Toaster />

@@ -4,26 +4,26 @@
 
 @layer base {
   :root {
-    /* 中性黑白灰主色（浅色：深灰主按钮 / 浅灰底） */
-    --background: 0 0% 97%;
-    --foreground: 0 0% 9%;
+    /* 浅色：冷灰画布 + 靛青主色，避免「纯黑白」过素 */
+    --background: 220 18% 96%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 9%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 12%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 94%;
-    --secondary-foreground: 0 0% 15%;
-    --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 42%;
-    --accent: 0 0% 92%;
-    --accent-foreground: 0 0% 12%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 234 55% 47%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 222 35% 18%;
+    --muted: 220 14% 91%;
+    --muted-foreground: 220 9% 38%;
+    --accent: 221 32% 93%;
+    --accent-foreground: 222 40% 14%;
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
-    --ring: 0 0% 28%;
+    --border: 220 12% 86%;
+    --input: 220 12% 86%;
+    --ring: 234 70% 52%;
     --radius: 1rem;
     --overlay: 0 0% 8%;
     /* 布局节奏（与 @layer components 同步，便于主题扩展） */
@@ -32,29 +32,34 @@
     --layout-page-px: 1rem;
     --layout-page-py: 1.5rem;
     --layout-section-gap: 2rem;
+    /* 列表表头：与主色同系深蓝 */
+    --data-table-header: 234 42% 22%;
+    --data-table-header-foreground: 210 40% 98%;
   }
 
   .dark {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 96%;
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 96%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 0 0% 96%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 58%;
-    --accent: 0 0% 16%;
-    --accent-foreground: 0 0% 96%;
+    --background: 240 12% 7%;
+    --foreground: 210 25% 96%;
+    --card: 240 10% 10%;
+    --card-foreground: 210 25% 96%;
+    --popover: 240 10% 10%;
+    --popover-foreground: 210 25% 96%;
+    --primary: 234 72% 68%;
+    --primary-foreground: 234 45% 11%;
+    --secondary: 240 8% 16%;
+    --secondary-foreground: 210 20% 92%;
+    --muted: 240 8% 15%;
+    --muted-foreground: 215 16% 58%;
+    --accent: 240 10% 17%;
+    --accent-foreground: 210 25% 96%;
     --destructive: 0 58% 46%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 0% 72%;
+    --border: 240 8% 18%;
+    --input: 240 8% 18%;
+    --ring: 234 65% 62%;
     --overlay: 0 0% 3%;
+    --data-table-header: 234 38% 18%;
+    --data-table-header-foreground: 210 35% 96%;
   }
 }
 
@@ -85,11 +90,12 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   --shadow-card:
-    0 1px 2px rgb(15 23 42 / 0.04),
-    0 12px 40px -12px rgb(15 23 42 / 0.08);
+    0 1px 2px rgb(30 27 75 / 0.04),
+    0 4px 12px -2px rgb(30 27 75 / 0.06),
+    0 20px 48px -16px rgb(30 64 175 / 0.09);
   --shadow-float:
-    0 24px 60px -20px rgb(15 23 42 / 0.12),
-    0 10px 24px -10px rgb(15 23 42 / 0.08);
+    0 24px 60px -18px rgb(30 27 75 / 0.14),
+    0 12px 28px -8px rgb(49 46 129 / 0.12);
   --shadow-input: inset 0 1px 2px 0 rgb(15 23 42 / 0.05);
 }
 
@@ -105,21 +111,32 @@
   body {
     min-height: 100dvh;
     background-color: hsl(var(--background));
-    /* 极轻单色晕影，避免整屏「炫彩渐变」感 */
-    background-image: radial-gradient(
-      ellipse 100% 80% at 50% -30%,
-      hsl(var(--foreground) / 0.035),
-      transparent 52%
-    );
+    background-image:
+      radial-gradient(ellipse 120% 70% at 100% -10%, hsl(234 65% 58% / 0.09), transparent 52%),
+      radial-gradient(ellipse 90% 55% at 0% 100%, hsl(263 55% 58% / 0.07), transparent 48%),
+      radial-gradient(ellipse 100% 80% at 50% -30%, hsl(var(--foreground) / 0.04), transparent 52%);
     color: hsl(var(--foreground));
   }
 
   .dark body {
-    background-image: radial-gradient(
-      ellipse 90% 70% at 50% -20%,
-      hsl(var(--foreground) / 0.05),
-      transparent 48%
-    );
+    background-image:
+      radial-gradient(ellipse 100% 60% at 100% 0%, hsl(234 50% 40% / 0.12), transparent 45%),
+      radial-gradient(ellipse 80% 50% at 0% 100%, hsl(263 40% 45% / 0.1), transparent 48%),
+      radial-gradient(ellipse 90% 70% at 50% -20%, hsl(var(--foreground) / 0.05), transparent 48%);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+
+    html {
+      scroll-behavior: auto;
+    }
   }
 }
 
@@ -153,7 +170,7 @@
   }
 
   .app-page-title {
-    @apply text-xl font-semibold tracking-tight text-foreground sm:text-2xl;
+    @apply relative border-l-[3px] border-primary/80 pl-3 text-xl font-semibold tracking-tight text-foreground sm:text-2xl;
   }
 
   .app-page-desc {
@@ -264,7 +281,7 @@
    * 列表页数据表：深色表头 + 白底行（对齐参考稿 Order 表）
    */
   .app-data-table {
-    @apply overflow-hidden rounded-2xl border border-border/25 bg-card shadow-[0_10px_40px_-14px_rgb(15_23_42/0.09)];
+    @apply overflow-hidden rounded-2xl border border-indigo-200/25 bg-card shadow-[0_10px_40px_-14px_rgb(49_46_129/0.12),0_2px_8px_-4px_rgb(30_27_75/0.06)] dark:border-border/30 dark:shadow-[0_12px_40px_-16px_rgb(0_0_0/0.45)];
   }
 
   .app-data-table table {
@@ -273,7 +290,7 @@
   }
 
   .app-data-table thead tr {
-    @apply bg-[hsl(225_22%_19%)];
+    @apply bg-[hsl(var(--data-table-header))];
   }
 
   .app-data-table thead tr:first-child th:first-child {
@@ -285,7 +302,7 @@
   }
 
   .app-data-table thead .app-table-head {
-    @apply border-0 bg-transparent py-3.5 text-xs font-semibold uppercase tracking-wide text-white/90 sm:py-4;
+    @apply border-0 bg-transparent py-3.5 text-xs font-semibold uppercase tracking-wide text-[hsl(var(--data-table-header-foreground)/0.92)] sm:py-4;
   }
 
   .app-data-table tbody tr {
@@ -326,7 +343,11 @@
   }
 
   .docs-toc a {
-    @apply underline-offset-2;
+    @apply cursor-pointer rounded-md underline-offset-2 transition-colors duration-200 hover:text-foreground;
+  }
+
+  .docs-toc a:focus-visible {
+    @apply outline-none ring-2 ring-ring/60 ring-offset-2 ring-offset-background;
   }
 
   .docs-prose {

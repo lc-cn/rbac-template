@@ -47,7 +47,7 @@ Phase A **运维与上线策略**（Turso 备份与 PITR、无行级审计时的
 | `pnpm run db:apply-sql sql/migrations/002_oauth2_authorization_server.sql` | 旧库仅补 OAuth2 表时使用（新库已含于 `sql/schema.sql`） |
 | `pnpm run db:apply-sql sql/migrations/005_oauth2_client_application_fk.sql` | 仅当库里 `Application` 仍带 `oauthClientId` 等列时执行一次（见 `sql/migrations/README.md`） |
 | `pnpm run db:apply-sql sql/migrations/007_wave3_collaboration.sql` | 存量库启用第三波：租户暂停/归档、邀请、owner 移交等（与 `sql/schema.sql` 同步后结构一致，见 `CONTEXT.md`） |
-| `pnpm run seed` | 写入初始数据（依赖 `.env` 中 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`） |
+| `pnpm run seed` | 写入初始数据（依赖根目录 `.env.local` 或 `.env` 中 `DATABASE_URL` / `DATABASE_AUTH_TOKEN`） |
 
 ---
 
@@ -55,9 +55,8 @@ Phase A **运维与上线策略**（Turso 备份与 PITR、无行级审计时的
 
 ```bash
 pnpm install
-cp .env.example .env
-# 将 .env 中的 DATABASE_URL、DATABASE_AUTH_TOKEN 填为 Turso 提供的值
-# 可选：cp .env .env.local 供 Next 加载
+cp .env.example .env.local
+# 将 .env.local 中的 DATABASE_URL、DATABASE_AUTH_TOKEN 填为 Turso 提供的值（可与 `vercel env pull` 合并为同一文件）
 
 # 空库：建表
 pnpm run db:apply-sql
@@ -68,7 +67,7 @@ pnpm run seed
 pnpm dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000)。请在 `.env` 或 `.env.local` 中配置 `NEXTAUTH_URL`（如 `http://localhost:3000`）与 `NEXTAUTH_SECRET`（生产务必使用强随机值；未配置时开发环境有代码内回退，**勿用于公网**）。
+打开 [http://localhost:3000](http://localhost:3000)。请在 `.env.local`（或 `.env`）中配置 `NEXTAUTH_URL`（如 `http://localhost:3000`）与 `NEXTAUTH_SECRET`（生产务必使用强随机值；未配置时开发环境有代码内回退，**勿用于公网**）。推荐本地只维护 **一份** `.env.local`，避免与 `.env` 双轨导致密钥或 URL 不一致。
 
 | 默认管理员邮箱 | 默认密码 |
 |----------------|----------|
@@ -96,7 +95,7 @@ turso db tokens create rbac-template  # 得到长令牌
 
 ### 2. 在本地对「线上空库」执行建表 + 种子（一次性）
 
-在项目根配置与线上一致的 `DATABASE_URL`、`DATABASE_AUTH_TOKEN`（可临时写在 `.env` 或 shell `export`），然后：
+在项目根配置与线上一致的 `DATABASE_URL`、`DATABASE_AUTH_TOKEN`（写在 `.env.local` 或 shell `export`），然后：
 
 ```bash
 pnpm install

@@ -66,7 +66,7 @@ export function AppNavbar({ onOpenMobileNav }: AppNavbarProps) {
     status === 'authenticated' && session?.user && (tenants.length > 0 || allowSelfServiceCreate)
 
   return (
-    <header className="flex h-12 w-full shrink-0 items-center gap-2 border-b border-border/40 bg-card/95 px-2 shadow-[0_1px_0_rgb(15_23_42/0.04)] backdrop-blur-md sm:gap-3 sm:px-4">
+    <header className="flex h-12 w-full shrink-0 items-center gap-2 border-b border-indigo-200/20 bg-card/90 px-2 shadow-[0_1px_0_rgb(49_46_129/0.06),inset_0_1px_0_rgb(255_255_255/0.65)] backdrop-blur-xl sm:gap-3 sm:px-4 dark:border-white/[0.06] dark:bg-card/85 dark:shadow-[0_1px_0_rgb(0_0_0/0.35)]">
       <Button
         type="button"
         variant="ghost"

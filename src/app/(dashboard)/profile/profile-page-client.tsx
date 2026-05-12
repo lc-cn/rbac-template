@@ -221,12 +221,12 @@ export function ProfilePageClient({ initialTab }: { initialTab?: ProfileTab }) {
           </TabsList>
 
           <TabsContent value="general" forceMount className="mt-0 data-[state=inactive]:hidden">
-            <Card>
+            <Card className="mx-auto w-full max-w-xl">
               <CardHeader>
                 <CardTitle className="text-base">{t('profile.sectionProfile')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <form onSubmit={onSaveProfile} className="max-w-xl space-y-4">
+                <form onSubmit={onSaveProfile} className="w-full space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="pf-name">{t('profile.name')}</Label>
                     <Input id="pf-name" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -252,7 +252,7 @@ export function ProfilePageClient({ initialTab }: { initialTab?: ProfileTab }) {
           </TabsContent>
 
           <TabsContent value="password" forceMount className="mt-0 data-[state=inactive]:hidden">
-            <Card>
+            <Card className="mx-auto w-full max-w-xl">
               <CardHeader>
                 <CardTitle className="text-base">{t('profile.sectionPassword')}</CardTitle>
               </CardHeader>
@@ -260,7 +260,7 @@ export function ProfilePageClient({ initialTab }: { initialTab?: ProfileTab }) {
                 {!user.hasPassword ? (
                   <p className="mb-4 text-sm text-muted-foreground">{t('profile.noPasswordHint')}</p>
                 ) : null}
-                <form onSubmit={onChangePassword} className="max-w-xl space-y-4">
+                <form onSubmit={onChangePassword} className="w-full space-y-4">
                   {user.hasPassword ? (
                     <div className="space-y-2">
                       <Label htmlFor="pf-cur-pw">{t('profile.currentPassword')}</Label>
@@ -311,12 +311,12 @@ export function ProfilePageClient({ initialTab }: { initialTab?: ProfileTab }) {
           </TabsContent>
 
           <TabsContent value="danger" className="mt-0 focus-visible:outline-none data-[state=inactive]:hidden">
-            <Card className="border-destructive/40">
+            <Card className="mx-auto w-full max-w-xl border-destructive/40">
               <CardHeader>
                 <CardTitle className="text-base text-destructive">{t('profile.sectionDanger')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="mb-4 max-w-xl text-sm text-muted-foreground">{t('profile.deleteWarning')}</p>
+                <p className="mb-4 text-sm text-muted-foreground">{t('profile.deleteWarning')}</p>
                 <Button type="button" variant="destructive" onClick={() => setDeleteOpen(true)}>
                   {t('profile.deleteAccount')}
                 </Button>

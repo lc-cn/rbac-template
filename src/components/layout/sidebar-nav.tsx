@@ -98,7 +98,7 @@ export function SidebarNav({
         )}
         <div
           className={cn(
-            'rounded-2xl border border-border/60 bg-muted/60 shadow-sm',
+            'rounded-2xl border border-indigo-200/35 bg-gradient-to-br from-card to-indigo-50/[0.35] shadow-sm ring-1 ring-indigo-950/[0.03] dark:border-indigo-500/10 dark:from-muted/50 dark:to-violet-950/20 dark:ring-white/5',
             collapsed ? 'flex items-center justify-center px-0 py-3' : 'px-4 py-4'
           )}
           aria-label={collapsed ? t('nav.brand') : undefined}
@@ -133,11 +133,11 @@ export function SidebarNav({
                   aria-label={label}
                   title={collapsed ? label : undefined}
                   className={cn(
-                    'flex items-center rounded-xl border border-transparent text-sm font-medium transition-colors duration-200',
+                    'flex cursor-pointer items-center rounded-xl border border-transparent text-sm font-medium outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
                     collapsed ? 'justify-center px-0 py-2.5' : 'gap-3 px-3 py-2.5',
                     isActive
-                      ? 'border-foreground/15 bg-muted font-medium text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:border-border/60 hover:bg-muted/70 hover:text-foreground'
+                      ? 'border-primary/25 bg-gradient-to-r from-primary/[0.08] to-primary/[0.02] font-semibold text-foreground shadow-sm ring-1 ring-primary/10'
+                      : 'text-muted-foreground hover:border-primary/15 hover:bg-muted/80 hover:text-foreground'
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />

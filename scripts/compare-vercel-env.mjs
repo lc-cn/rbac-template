@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * 对比本地 .env 与 Vercel 某环境已配置的变量名（不打印值）。
+ * 对比本地 .env.local（或指定文件）与 Vercel 某环境已配置的变量名（不打印值）。
  *
  * 前置：仓库根目录已 `vercel link`，且本机已登录 `vercel login`。
  *
  * 用法：
- *   node scripts/compare-vercel-env.mjs [.env路径] [production|preview|development]
+ *   node scripts/compare-vercel-env.mjs [.env.local路径] [production|preview|development]
  *
  * 示例：
- *   node scripts/compare-vercel-env.mjs .env production
+ *   node scripts/compare-vercel-env.mjs .env.local production
  *
  * 关于「CLI 挂起」：在 IDE/自动化里子进程会继承管道型 stdin，若未关闭，
  * `vercel env add` 等仍可能等待输入。脚本已 stdin: ignore + CI=1 + 全局 --non-interactive。
@@ -23,7 +23,7 @@ import { fileURLToPath } from 'node:url'
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const root = resolve(__dirname, '..')
 
-const localPath = resolve(root, process.argv[2] ?? '.env')
+const localPath = resolve(root, process.argv[2] ?? '.env.local')
 const target = process.argv[3] ?? 'production'
 
 const IGNORE_LOCAL_ONLY = new Set(['NODE_ENV'])

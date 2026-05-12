@@ -39,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMobileNavOpen(false)}
           />
           <aside
-            className="fixed left-0 top-0 z-50 flex h-[100dvh] max-h-[100dvh] min-h-0 w-[min(20rem,88vw)] max-w-full flex-col overflow-hidden border-r border-border/40 bg-card shadow-float ring-1 ring-black/[0.04] dark:ring-white/10 md:hidden"
+            className="fixed left-0 top-0 z-50 flex h-[100dvh] max-h-[100dvh] min-h-0 w-[min(20rem,88vw)] max-w-full flex-col overflow-hidden border-r border-indigo-200/30 bg-gradient-to-b from-card via-card to-indigo-50/[0.2] shadow-float ring-1 ring-indigo-950/[0.05] dark:border-indigo-500/10 dark:from-card dark:via-card dark:to-violet-950/25 dark:ring-white/10 md:hidden"
             role="dialog"
             aria-modal="true"
           >
@@ -55,7 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <AppNavbar onOpenMobileNav={() => setMobileNavOpen(true)} />
         <MfaEncouragementBanner />
-        <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth overscroll-y-contain [scrollbar-gutter:stable]">
+        <main className="relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth overscroll-y-contain bg-gradient-to-b from-transparent via-transparent to-indigo-50/[0.12] [scrollbar-gutter:stable] dark:to-violet-950/10">
           {children}
         </main>
       </div>

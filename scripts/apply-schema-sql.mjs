@@ -5,9 +5,9 @@
  *   pnpm run db:apply-sql
  *   pnpm run db:apply-sql path/to/schema.sql
  *
- * 需在项目根 .env 中配置 DATABASE_URL（libsql://...）与 DATABASE_AUTH_TOKEN。
+ * 需在项目根 `.env.local` 或 `.env` 中配置 DATABASE_URL（libsql://...）与 DATABASE_AUTH_TOKEN。
  */
-import 'dotenv/config'
+import './dotenv-config.mjs'
 import fs from 'node:fs'
 import path from 'node:path'
 import { createClient } from '@libsql/client'
@@ -16,7 +16,7 @@ const file = path.resolve(process.argv[2] || 'sql/schema.sql')
 
 const url = process.env.DATABASE_URL?.trim()
 if (!url?.startsWith('libsql:')) {
-  console.error('错误：请在 .env 中设置 DATABASE_URL=libsql://...')
+  console.error('错误：请在根目录 .env.local 或 .env 中设置 DATABASE_URL=libsql://...')
   process.exit(1)
 }
 
